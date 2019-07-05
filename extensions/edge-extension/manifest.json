@@ -1,0 +1,28 @@
+{
+
+  "manifest_version": 2,
+  "name": "Transient Authentication",
+  "version": "1.0",
+
+  "description": "Adds a browser action icon to the toolbar. Click the button to choose a beast. The active tab's body content is then replaced with a picture of the chosen beast. See https://developer.mozilla.org/en-US/Add-ons/WebExtensions/Examples#beastify",
+  "homepage_url": "https://github.com/mdn/webextensions-examples/tree/master/beastify",
+  "author" : "Renata",
+  "icons": {
+    "40": "icon-40.png"
+  },
+
+  "background" : {
+    "scripts" : ["background.js"],
+    "persistent" : false
+  },
+
+  "permissions": [
+    "<all_urls>",
+    "localhost:5000"
+  ],
+
+  "browser_action": {
+    "default_icon": "icon-40.png",
+    "default_title": "Transient Authentication"
+  }
+}

@@ -1,5 +1,5 @@
 import click
-import initialization.authentication as authentication
+import initialization.hashes_init as hashes_init
 
 @click.group()
 def cli():
@@ -7,9 +7,9 @@ def cli():
 
 
 @cli.command()
-@click.option('--repo-path', default='E:\\OLL2\library\\backup\\cityofsanmateo\\law-html', help='path to the html repository')
-@click.option('--initial-commit', default='c2240d7a16d136659fe76d1db08ad9fd6ebbe35d', help='First commit representing state of the repository which should be entered into the database')
+@click.option('--repo-path', default='E:\\OLL2\\library\\transient_auth_test\\law-html', help='path to the html repository')
+@click.option('--initial-commit', default=None, help='First commit representing state of the repository which should be entered into the database')
 def initialize_hashes(repo_path, initial_commit):
-  authentication.initialize_hashes(repo_path, initial_commit)
+  hashes_init.initialize_hashes(repo_path, initial_commit)
 
 cli()

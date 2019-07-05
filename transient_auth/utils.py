@@ -16,7 +16,7 @@ def calc_page_hash(file_path, driver):
   driver.get(f'file://{file_path}')
   page_source = driver.page_source
   doc = et.fromstring(page_source, et.HTMLParser())
-  body_section = doc.xpath(".//section[@class='col8 body']")
+  body_section = doc.xpath(".//*[contains(@class, 'tuf-authenticate')]")
   if body_section:
     return hasher(et.tostring(body_section[0])).hexdigest()
   return None
