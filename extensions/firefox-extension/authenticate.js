@@ -3,7 +3,7 @@ href = window.location.href
 url = new URL(href).pathname
 
 var xhr = new XMLHttpRequest();
-xhr.open("POST", 'http://localhost:5000/authenticate', true);
+xhr.open("POST", 'http://localhost:8000/authenticate', true);
 
 if (href.endsWith('.pdf')){
   JSAlert.alert("Validation initiated...").dismissIn(1000 * 3);

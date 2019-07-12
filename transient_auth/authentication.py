@@ -3,6 +3,8 @@ from lxml import etree as et
 from .models import Hash, Commit
 from .utils import calc_file_hash, calc_binary_content_hash
 
+# TODO we need to store the information about which edition the document
+# belongs to (and to which repository that edition belongs to)
 
 def check_pdf_authenticity(pdf_content, url):
   pdf_hash = calc_binary_content_hash(pdf_content)
