@@ -4,12 +4,12 @@ from git import Repo
 from datetime import datetime
 from selenium import webdriver
 from django.core.wsgi import get_wsgi_application
-
+from pathlib import Path
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "authsite.settings")
 application = get_wsgi_application()
 
-from transient_auth.models import Commit, Hash
+from transient_auth.models import Commit, Hash, Edition, Repository
 from transient_auth.utils import calc_file_hash, calc_page_hash
 
 options = webdriver.ChromeOptions()
@@ -17,14 +17,43 @@ options.add_argument("headless")
 driver = webdriver.Chrome(chrome_options=options)
 
 def initialize_hashes(repo_path, initial_commit=None):
+  repo_path = Path(repo_path)
+  repo_name = '{}/{}'.format(repo_path.parent.name, repo_path.name)
+  repo = Repo(str(repo_path))
+  commits = list(repo.iter_commits('master'))[::-1]
+  if initial_commit is None:
+    initial_commit = commits[0]
+
+  commit_date = repo.git.show(s=True, format='%ci {}'.format(initial_commit)).split()[0]
+
+  # check if repository already
+  repository = Repository.objects.filter(name=repo_name).first()
+  if repository is None:
+    repository = Repository(name=repo_name)
+    repository.save()
+    edition = None
+  else:
+    # try to find edition by repo name and commit date
+    edition = Edition.objects.filter(repository=repository.id, date=commit_date).first()
+
+  if edition is not None:
+    create = ('Edition already created. Do you want to delete it and create it again? [y/n]: ')
+    if create != 'y':
+      return
+    edition.delete()
+
+  edition_name = commit_date.rsplit('-', 1)[0]
+  edition = Edition(name=edition_name, date=commit_date, repository=repository)
+  edition.save()
+
   hashes_count = Hash.objects.count()
   print(hashes_count)
   if hashes_count > 0:
     print('Hashes already exist. Remove the existing hashes from the database '
           'and execute the command again if necessary')
    #return
-  repo = Repo(repo_path)
-  commits = list(repo.iter_commits('master'))[::-1]
+
+
   if initial_commit is not None:
     commit_index = None
     for index, commit in enumerate(commits):
