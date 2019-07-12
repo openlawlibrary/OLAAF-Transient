@@ -22,11 +22,14 @@ def initialize_hashes(repo_path, initial_commit=None):
   repo = Repo(str(repo_path))
   commits = list(repo.iter_commits('master'))[::-1]
   if initial_commit is None:
-    initial_commit = commits[0]
+    initial_commit = commits[0].hexsha
 
   commit_date = repo.git.show(s=True, format='%ci {}'.format(initial_commit)).split()[0]
 
-  # check if repository already
+  # TODO we need to know when an edition ends and where it begins
+  # since editions are on branches, maybe use them
+  # or call this edition by edition
+
   repository = Repository.objects.filter(name=repo_name).first()
   if repository is None:
     repository = Repository(name=repo_name)
@@ -37,7 +40,7 @@ def initialize_hashes(repo_path, initial_commit=None):
     edition = Edition.objects.filter(repository=repository.id, date=commit_date).first()
 
   if edition is not None:
-    create = ('Edition already created. Do you want to delete it and create it again? [y/n]: ')
+    create = input('Edition already created. Do you want to delete it and create it again? [y/n]: ')
     if create != 'y':
       return
     edition.delete()
@@ -46,45 +49,36 @@ def initialize_hashes(repo_path, initial_commit=None):
   edition = Edition(name=edition_name, date=commit_date, repository=repository)
   edition.save()
 
-  hashes_count = Hash.objects.count()
-  print(hashes_count)
-  if hashes_count > 0:
-    print('Hashes already exist. Remove the existing hashes from the database '
-          'and execute the command again if necessary')
-   #return
+  commit_index = None
+  for index, commit in enumerate(commits):
+    if initial_commit == commit.hexsha:
+      commit_index = index
+      break
+  if commit_index is None:
+    print('The specified initial commit does not exist')
+    return
+  commits = commits[commit_index::]
 
-
-  if initial_commit is not None:
-    commit_index = None
-    for index, commit in enumerate(commits):
-      if initial_commit == commit.hexsha:
-        commit_index = index
-        break
-    if commit_index is None:
-      print('The specified initial commit does not exist')
-      return
-    commits = commits[commit_index::]
-
-  _insert_hashes_initial(repo, commits[0])
+  _insert_hashes_initial(repo, commits[0], edition)
   commits_count = len(commits)
   previous_commit = Commit.objects.get(sha=commits[0].hexsha)
   for commit in commits[1::]:
     date = datetime.utcfromtimestamp(commit.committed_date).strftime('%Y-%m-%d %H:%M')
     current_commit = Commit.objects.filter(sha=commit.hexsha).first()
     if current_commit is None:
-      current_commit = Commit(sha=commit.hexsha, date=date)
+      current_commit = Commit(edition=edition, sha=commit.hexsha, date=date)
       current_commit.save()
     insert_commit_hashes(repo, previous_commit, current_commit)
     previous_commit = current_commit
 
 
-def _insert_hashes_initial(repo, commit):
+def _insert_hashes_initial(repo, commit, edition):
   '''
   Calculates and inserts hashes by traversing through all files in the repository
   '''
   repo.git.checkout(commit)
   date = datetime.utcfromtimestamp(commit.committed_date).strftime('%Y-%m-%d %H:%M')
-  commit = Commit(sha=commit.hexsha, date=date)
+  commit = Commit(sha=commit.hexsha, date=date, edition=edition)
   commit.save()
 
   for root, directories, filenames in os.walk(repo.working_dir):
@@ -97,6 +91,7 @@ def _insert_hashes_initial(repo, commit):
           file_path = os.path.abspath(os.path.join(root, file_name))
           hash_value = _calculate_file_hash(file_path)
           path = posixpath.join(url, file_name)
+          path = path.rsplit('.', 1)[0]
           if hash_value is not None:
             h = Hash(value=hash_value, path=path, start_commit=commit)
             h.save()
@@ -109,7 +104,6 @@ def insert_commit_hashes(repo, prev_commit, current_commit):
   print('Inserting commits. Previous commit {} current commit {}'.format(prev_commit, current_commit))
   diff = repo.git.diff('--name-status', prev_commit.sha, current_commit.sha)
   diff_names = diff.split('\n')
-  print(len(diff_names))
   for changed_file in diff_names:
     # we do not want to calculate hashes of index pages, images, json files etc.
     if changed_file.endswith('.html') or changed_file.endswith('.pdf'):
@@ -121,6 +115,8 @@ def insert_commit_hashes(repo, prev_commit, current_commit):
       repo.git.checkout(current_commit.sha, changed_file)
       hash_value = _calculate_file_hash(file_path)
       path = changed_file.replace(os.sep, '/')
+      # remove .html
+      path = path.rsplit('.', 1)[0]
       previous_hash = Hash.objects.filter(path=path, start_commit=prev_commit).first()
       if previous_hash is None:
         continue
