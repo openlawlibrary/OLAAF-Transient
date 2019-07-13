@@ -68,7 +68,8 @@ def initialize_hashes(repo_path, initial_commit=None):
     if current_commit is None:
       current_commit = Commit(edition=edition, sha=commit.hexsha, date=date)
       current_commit.save()
-    insert_commit_hashes(repo, previous_commit, current_commit)
+
+    insert_diff_hashes(repo, prev_commit, current_commit)
     previous_commit = current_commit
 
 
@@ -97,13 +98,38 @@ def _insert_hashes_initial(repo, commit, edition):
             h.save()
 
 
-def insert_commit_hashes(repo, prev_commit, current_commit):
-  '''
-  Calculates and inserts hashes of modified files only
-  '''
-  print('Inserting commits. Previous commit {} current commit {}'.format(prev_commit, current_commit))
+def post_merge_add_hashes(repo_path):
+  repo_path = Path(repo_path)
+  repo_name = '{}/{}'.format(repo_path.parent.name, repo_path.name)
+
+  repository = Repository.objects.filter(name=repo_name).first()
+  if repository is None:
+    print('Repository hashes not initialized')
+    return
+  # add to the current edition
+  edition = Edition.objects.filter(repository=repository).reverse()[0]
+
+  repo = Repo(str(repo_path))
+  # find the previous commit 'ORIG_HEAD'
+  prev_commit_sha = repo.git.rev_parse('ORIG_HEAD')
+  prev_commit = Commit.objects.filter(edition=edition, sha=prev_commit_sha).first()
+  if prev_commit is None:
+    print('Commit {} not found in the databa.'.format(prev_commit_sha))
+    return
+  new_commit_sha = repo.git.rev_parse('HEAD')
+  commit_date = repo.git.show(s=True, format='%ci {}'.format(new_commit_sha)).split()[0]
+  new_commit = Commit(sha=new_commit_sha, date=commit_date, edition=edition)
+  new_commit.save()
+  insert_diff_hashes(repo, prev_commit, new_commit)
+
+
+def insert_diff_hashes(repo, prev_commit, current_commit):
+
+  print('Inserting diff hashes. Previous commit {} current commit {}'.format(prev_commit,
+                                                                             current_commit))
   diff = repo.git.diff('--name-status', prev_commit.sha, current_commit.sha)
   diff_names = diff.split('\n')
+
   for changed_file in diff_names:
     # we do not want to calculate hashes of index pages, images, json files etc.
     if changed_file.endswith('.html') or changed_file.endswith('.pdf'):
