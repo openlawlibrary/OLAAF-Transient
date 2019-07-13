@@ -69,8 +69,9 @@ def initialize_hashes(repo_path, initial_commit=None):
       current_commit = Commit(edition=edition, sha=commit.hexsha, date=date)
       current_commit.save()
 
-    insert_diff_hashes(repo, prev_commit, current_commit)
+    insert_diff_hashes(repo, previous_commit, current_commit)
     previous_commit = current_commit
+  repo.git.checkout('master')
 
 
 def _insert_hashes_initial(repo, commit, edition):

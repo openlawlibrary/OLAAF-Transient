@@ -11,6 +11,6 @@ def authenticate(request):
   if url.endswith('.pdf'):
     pdf = request.FILES['pdf']
     return HttpResponse(check_pdf_authenticity(pdf, url))
-  print(url)
+
   content = request.POST.get('content')
   return HttpResponse(check_html_authenticity(content, url))
