@@ -129,7 +129,6 @@ def insert_diff_hashes(repo, prev_commit, current_commit):
                                                                              current_commit))
   diff = repo.git.diff('--name-status', prev_commit.sha, current_commit.sha)
   diff_names = diff.split('\n')
-
   for changed_file in diff_names:
     # we do not want to calculate hashes of index pages, images, json files etc.
     if changed_file.endswith('.html') or changed_file.endswith('.pdf'):
