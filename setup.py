@@ -62,11 +62,6 @@ setup(
         'dev': dev_require
     },
     tests_require=tests_require,
-    entry_points={
-        'console_scripts': [
-            'olaaf = initialization.cli:main'
-        ]
-    },
     classifiers=[
         'Development Status :: 2 - Pre-Alpha',
         'Intended Audience :: Developers',

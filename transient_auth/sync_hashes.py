@@ -1,16 +1,10 @@
 import os
-import posixpath
+import tempfile
+import uuid
 from git import Repo
 from datetime import datetime
 from selenium import webdriver
-from django.core.wsgi import get_wsgi_application
 from pathlib import Path
-import tempfile
-import uuid
-
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "authsite.settings")
-application = get_wsgi_application()
-
 from transient_auth.models import Commit, Hash, Edition, Repository
 from transient_auth.utils import calc_file_hash, calc_page_hash
 
