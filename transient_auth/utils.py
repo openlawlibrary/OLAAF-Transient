@@ -1,6 +1,7 @@
 import hashlib
 from lxml import etree as et
 import os
+import html
 
 hasher = hashlib.sha256
 
@@ -15,6 +16,8 @@ def calc_page_hash(file_path, driver):
   file_path = os.path.abspath(file_path)
   driver.get(f'file://{file_path}')
   page_source = driver.page_source
+  # unescape page source
+  page_source = html.unescape(page_source)
   doc = et.fromstring(page_source, et.HTMLParser())
   body_section = doc.xpath(".//*[contains(@class, 'tuf-authenticate')]")
   if body_section:
