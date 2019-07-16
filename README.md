@@ -6,31 +6,26 @@ Implementation of transient authentication
 
 Download web driver for Chrome: https://sites.google.com/a/chromium.org/chromedriver/downloads
 Include the Chrome driver location in the path environment variable. Make sure that
-`chromedriver.exe` version matches version of the installed `Google Chrome` browser. 
+`chromedriver.exe` version matches version of the installed `Google Chrome` browser.
 
 ## Quick setup
 
 In order to install the package, activate virtual env if any and from this dir run
-`pip install -e .` .Once installed, cli interface is available through `auth` command.
-Type `auth --help` for more options.
+`pip install -e .` .
 
-### Run hashes initialization
+### Run hashes synchronization
 
-In order to run initialization, run the following:
-`auth initialize --repo-path path_to_html_repo --initial-tag first_tag_to_be_inserted`.
-Last flag `first_tag_to_be_inserted` is git commit tag specified in this format:
-`yyyy-mm-dd/yyyy-mm-dd`. In order to add a new tag, after changes have been committed,
-type `git tag tag_name`, where's `tag_name` should be specified in the format above.
+In order to run synchronization of hashes, run the following:
+`python manage.py synchashes E:\library\law-html`
 
 ### Run local server
 
-Navigate to `open-law-authentication\oll\auth\server` and run `flask run` in order
-to start local server.
+Navigate to `OLAAF-Transient` and run `python manage.py runserver` in order to start the local server.
 
 ### Extensions setup
 
 Once hashes are stored to database, then it's required to install extensions so that
-hashes can be verified. 
+hashes can be verified.
 
 #### Chrome setup
 
