@@ -5,7 +5,8 @@ from datetime import datetime
 from selenium import webdriver
 from django.core.wsgi import get_wsgi_application
 from pathlib import Path
-from tempfile import NamedTemporaryFile
+import tempfile
+import uuid
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "authsite.settings")
 application = get_wsgi_application()
@@ -81,10 +82,8 @@ def _insert_diff_hashes(repo, prev_commit, current_commit):
       # M/A file_name.html
       # so remove the modified/added indicator (first letter) and whitespaces
       action, file_name = changed_file.split(maxsplit=1)
-      file_path = os.path.abspath(os.path.join(repo.working_dir, file_name))
       path = file_name.replace(os.sep, '/')
       # if file was added or modified, calculate the new hash
-      url = path
       if file_name.endswith('.html'):
         url = path.rsplit('.', 1)[0]
       # if file aready existed and it was modified or deleted update previous hash
@@ -102,11 +101,16 @@ def _insert_diff_hashes(repo, prev_commit, current_commit):
 def _calculate_file_hash(repo, path, commit):
   # save file content to a temporary file
   file_contents = repo.git.show('{}:{}'.format(commit.sha, path))
-  f = NamedTemporaryFile(delete=False)
-  f.write(file_contents.encode())
-  f.close()
-  if path.endswith('.pdf'):
-    return calc_file_hash(f.name)
-  else:
-    return calc_page_hash(f.name, driver)
-  os.unlink(f.name)
+  temp_dir = tempfile.gettempdir()
+  # the file must have .html extension
+  # if that is not the case, the browser will not open it correctly
+  file_path = os.path.join(temp_dir, str(uuid.uuid4()) + '.html')
+  try:
+    with open(file_path, 'wb') as f:
+      f.write(file_contents.encode('utf-8'))
+    if path.endswith('.pdf'):
+      return calc_file_hash(file_path)
+    else:
+      return calc_page_hash(file_path, driver)
+  finally:
+     os.remove(file_path)
