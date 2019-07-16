@@ -16,15 +16,11 @@ options = webdriver.ChromeOptions()
 options.add_argument("headless")
 driver = webdriver.Chrome(chrome_options=options)
 
-def initialize_hashes(repo_path, initial_commit=None):
+def initialize_hashes(repo_path):
   repo_path = Path(repo_path)
   repo_name = '{}/{}'.format(repo_path.parent.name, repo_path.name)
   repo = Repo(str(repo_path))
-  commits = list(repo.iter_commits('master'))[::-1]
-  if initial_commit is None:
-    initial_commit = commits[0].hexsha
-
-  commit_date = repo.git.show(s=True, format='%ci {}'.format(initial_commit)).split()[0]
+  repo_commits = list(repo.iter_commits('master'))[::-1]
 
   # TODO we need to know when an edition ends and where it begins
   # since editions are on branches, maybe use them
@@ -36,41 +32,38 @@ def initialize_hashes(repo_path, initial_commit=None):
     repository.save()
     edition = None
   else:
-    # try to find edition by repo name and commit date
-    edition = Edition.objects.filter(repository=repository.id, date=commit_date).first()
+    # update the latest edition
+    edition = Edition.objects.filter(repository=repository).latest('id')
 
-  if edition is not None:
-    create = input('Edition already created. Do you want to delete it and create it again? [y/n]: ')
-    if create != 'y':
-      return
-    edition.delete()
+  if edition is None:
+    # create the initial edition
+    commit_date = repo.git.show(s=True, format='%ci {}'.format(repo_commits[0].hexsha)).split()[0]
+    edition_name = commit_date.rsplit('-', 1)[0]
+    edition = Edition(name=edition_name, date=commit_date, repository=repository)
+    edition.save()
 
-  edition_name = commit_date.rsplit('-', 1)[0]
-  edition = Edition(name=edition_name, date=commit_date, repository=repository)
-  edition.save()
-
-  commit_index = None
-  for index, commit in enumerate(commits):
-    if initial_commit == commit.hexsha:
-      commit_index = index
-      break
-  if commit_index is None:
-    print('The specified initial commit does not exist')
+  # check if commits are already in the database
+  # if they are, see if there are commits which have not been inserted yet
+  # if not, insert the hashes from the beginning
+  inserted_commits = Commit.objects.filter(edition=edition)[::1]
+  if len(inserted_commits) == len(repo_commits):
+    print('All commits have been loaded into the database')
     return
-  commits = commits[commit_index::]
 
-  _insert_hashes_initial(repo, commits[0], edition)
-  commits_count = len(commits)
-  previous_commit = Commit.objects.get(sha=commits[0].hexsha)
-  for commit in commits[1::]:
+  if len(inserted_commits) == 0:
+    init_commit = _insert_hashes_initial(repo, repo_commits[0], edition)
+    inserted_commits.append(init_commit)
+
+  # find the last inserted commit
+  inserted_commits_num = len(inserted_commits)
+  prev_commit = inserted_commits[-1]
+  for commit in repo_commits[inserted_commits_num::]:
     date = datetime.utcfromtimestamp(commit.committed_date).strftime('%Y-%m-%d %H:%M')
-    current_commit = Commit.objects.filter(sha=commit.hexsha).first()
-    if current_commit is None:
-      current_commit = Commit(edition=edition, sha=commit.hexsha, date=date)
-      current_commit.save()
+    current_commit = Commit(edition=edition, sha=commit.hexsha, date=date)
+    current_commit.save()
+    _insert_diff_hashes(repo, prev_commit, current_commit)
+    prev_commit = current_commit
 
-    insert_diff_hashes(repo, previous_commit, current_commit)
-    previous_commit = current_commit
   repo.git.checkout('master')
 
 
@@ -97,7 +90,7 @@ def _insert_hashes_initial(repo, commit, edition):
           if hash_value is not None:
             h = Hash(value=hash_value, path=path, start_commit=commit)
             h.save()
-
+  return commit
 
 def post_merge_add_hashes(repo_path):
   repo_path = Path(repo_path)
@@ -121,10 +114,10 @@ def post_merge_add_hashes(repo_path):
   commit_date = repo.git.show(s=True, format='%ci {}'.format(new_commit_sha)).split()[0]
   new_commit = Commit(sha=new_commit_sha, date=commit_date, edition=edition)
   new_commit.save()
-  insert_diff_hashes(repo, prev_commit, new_commit)
+  _insert_diff_hashes(repo, prev_commit, new_commit)
 
 
-def insert_diff_hashes(repo, prev_commit, current_commit):
+def _insert_diff_hashes(repo, prev_commit, current_commit):
 
   print('Inserting diff hashes. Previous commit {} current commit {}'.format(prev_commit,
                                                                              current_commit))
@@ -136,21 +129,25 @@ def insert_diff_hashes(repo, prev_commit, current_commit):
       # git diff contains list of entries in the form of
       # M/A file_name.html
       # so remove the modified/added indicator (first letter) and whitespaces
-      changed_file = changed_file[1:].strip()
-      file_path = os.path.abspath(os.path.join(repo.working_dir, changed_file))
-      repo.git.checkout(current_commit.sha, changed_file)
-      hash_value = _calculate_file_hash(file_path)
-      path = changed_file.replace(os.sep, '/')
+      action, file_name = changed_file.split(maxsplit=1)
+      file_path = os.path.abspath(os.path.join(repo.working_dir, file_name))
+      path = file_name.replace(os.sep, '/')
       # remove .html
       path = path.rsplit('.', 1)[0]
-      previous_hash = Hash.objects.filter(path=path, start_commit=prev_commit).first()
-      if previous_hash is None:
-        continue
-      previous_hash.end_commit = current_commit
-      previous_hash.save()
-      if hash_value is not None:
-        h = Hash(value=hash_value, path=path, start_commit=current_commit)
-        h.save()
+      # if file aready existed and it was modified or deleted update previous hash
+      if action != 'A':
+        previous_hash = Hash.objects.get(path=path, end_commit__isnull=True)
+        previous_hash.end_commit = current_commit
+        previous_hash.save()
+        print('Updated hash for path ' + path)
+      # if file was added or modified, calculate the new hash
+      if action != 'D':
+        repo.git.checkout(current_commit.sha, file_name)
+        hash_value = _calculate_file_hash(file_path)
+        if hash_value is not None:
+          h = Hash(value=hash_value, path=path, start_commit=current_commit)
+          h.save()
+          print('Create new hash for path ' + path)
 
 
 def _calculate_file_hash(file_path):
