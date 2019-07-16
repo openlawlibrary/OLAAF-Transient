@@ -1,5 +1,5 @@
 import subprocess
-from initialization.hashes_init import post_merge_add_hashes
+from initialization.hashes_init import sync_hashes
 
 def system(*args, **kwargs):
   kwargs.setdefault('stdout', subprocess.PIPE)
@@ -8,4 +8,4 @@ def system(*args, **kwargs):
   return out
 
 repo_path = system('git', 'rev-parse', '--show-toplevel').decode().strip()
-post_merge_add_hashes(repo_path)
+sync_hashes(repo_path)

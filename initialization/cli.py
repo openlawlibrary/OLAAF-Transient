@@ -9,6 +9,6 @@ def cli():
 @cli.command()
 @click.option('--repo-path', default='E:\\OLL2\\library\\transient_auth_test\\law-html', help='path to the html repository')
 def initialize_hashes(repo_path):
-  hashes_init.initialize_hashes(repo_path)
+  hashes_init.sync_hashes(repo_path)
 
 cli()

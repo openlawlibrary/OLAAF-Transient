@@ -20,7 +20,7 @@ driver = webdriver.Chrome(chrome_options=options)
 
 EMPTY_TREE_SHA = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 
-def initialize_hashes(repo_path):
+def sync_hashes(repo_path):
   repo_path = Path(repo_path)
   repo_name = '{}/{}'.format(repo_path.parent.name, repo_path.name)
   repo = Repo(str(repo_path))
