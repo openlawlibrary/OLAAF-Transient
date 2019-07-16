@@ -87,16 +87,16 @@ def _insert_diff_hashes(repo, prev_commit, current_commit):
       url = path
       if file_name.endswith('.html'):
         url = path.rsplit('.', 1)[0]
-      if action != 'D':
-        hash_value = _calculate_file_hash(repo, path, current_commit)
-        if hash_value is not None:
-          h = Hash(value=hash_value, path=url, start_commit=current_commit)
-          h.save()
       # if file aready existed and it was modified or deleted update previous hash
       if action != 'A':
         previous_hash = Hash.objects.get(path=url, end_commit__isnull=True)
         previous_hash.end_commit = current_commit
         previous_hash.save()
+      if action != 'D':
+        hash_value = _calculate_file_hash(repo, path, current_commit)
+        if hash_value is not None:
+          h = Hash(value=hash_value, path=url, start_commit=current_commit)
+          h.save()
 
 
 def _calculate_file_hash(repo, path, commit):
