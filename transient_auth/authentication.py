@@ -7,22 +7,20 @@ from .utils import calc_file_hash, calc_binary_content_hash
 # belongs to (and to which repository that edition belongs to)
 
 def check_pdf_authenticity(pdf_content, url):
-  import pdb; pdb.set_trace()
-  pdf_content = pdf_content.file.read()
+  pdf_content = pdf_content.decode('utf-8', 'surrogateescape').strip().encode('utf-8', 'surrogateescape')
   pdf_hash = calc_binary_content_hash(pdf_content)
-  path = url.split('/')[-1]
-  return check_authenticity(pdf_hash, path)
+  return check_authenticity(pdf_hash, url)
 
 def check_html_authenticity(content, url):
   parser = et.HTMLParser()
   doc = et.fromstring(content, parser)
   body_section = doc.xpath(".//*[contains(@class, 'tuf-authenticate')]")[0]
   file_hash = hashlib.sha256(et.tostring(body_section)).hexdigest()
+  return check_authenticity(file_hash, url)
+
+
+def check_authenticity(file_hash, url):
   path = url[1:]
-  return check_authenticity(file_hash, path)
-
-
-def check_authenticity(file_hash, path):
   hashes = list(Hash.objects.filter(path=path))
   if not len(hashes):
     return 'Cannot authenticate'

@@ -6,7 +6,7 @@ from datetime import datetime
 from selenium import webdriver
 from pathlib import Path
 from transient_auth.models import Commit, Hash, Edition, Repository
-from transient_auth.utils import calc_file_hash, calc_page_hash
+from transient_auth.utils import calc_binary_content_hash, calc_page_hash
 
 options = webdriver.ChromeOptions()
 options.add_argument("headless")
@@ -99,16 +99,17 @@ def _calculate_file_hash(repo, path, commit, file_type):
   # save file content to a temporary file
   file_contents = repo.git.show('{}:{}'.format(commit.sha, path))
   temp_dir = tempfile.gettempdir()
-  # the file must have .html extension
-  # if that is not the case, the browser will not open it correctly
-  suffix = '.html' if file_type == 'html' else ''
-  file_path = os.path.join(temp_dir, str(uuid.uuid4()) + suffix)
-  try:
-    with open(file_path, 'wb') as f:
-      f.write(file_contents.encode('utf-8','surrogateescape'))
-    if path.endswith('.pdf'):
-      return calc_file_hash(file_path)
-    else:
-      return calc_page_hash(file_path, driver)
-  finally:
-    os.remove(file_path)
+  if file_type == 'html':
+    file_path = os.path.join(temp_dir, str(uuid.uuid4()) + '.html')
+    try:
+      # the file must have .html extension
+      # if that is not the case, the browser will not open it correctly
+      with open(file_path, 'wb') as f:
+        f.write(file_contents.encode('utf-8','surrogateescape'))
+      file_hash = calc_page_hash(file_path, driver)
+    finally:
+      os.remove(file_path)
+  else:
+    file_contents = file_contents.strip().encode('utf-8', 'surrogateescape')
+    file_hash = calc_binary_content_hash(file_contents)
+  return file_hash

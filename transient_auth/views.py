@@ -9,7 +9,7 @@ from .authentication import check_pdf_authenticity, check_html_authenticity
 def authenticate(request):
   url = request.POST.get('url')
   if url.endswith('.pdf'):
-    pdf = request.FILES['pdf']
+    pdf = request.FILES['pdf'].file.getvalue()
     return HttpResponse(check_pdf_authenticity(pdf, url))
 
   content = request.POST.get('content')
