@@ -24,14 +24,16 @@ def sync_hashes(repo_path):
   # since editions are on branches, maybe use them
   # or call this edition by edition
 
-  repository = Repository.objects.filter(name=repo_name).first()
-  if repository is None:
+  try:
+    repository = Repository.objects.get(name=repo_name)
+    edition = Edition.objects.filter(repository=repository).latest('id')
+  except Repository.DoesNotExist:
     repository = Repository(name=repo_name)
     repository.save()
     edition = None
-  else:
-    # update the latest edition
-    edition = Edition.objects.filter(repository=repository).latest('id')
+  except Repository.MultipleObjectsReturned:
+    print('Multiple repositories of the same name found. That should not be the case.')
+    return
 
   if edition is None:
     # create the initial edition
