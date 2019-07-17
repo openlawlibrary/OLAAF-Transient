@@ -1,6 +1,30 @@
 # OLAAF-Transient
 
-Implementation of transient authentication
+OLAAF-Transient provides an implementation of the transient authentication. Goal of this type of
+authentication is to check if a particular version of a document is authentic or not. The basic
+idea behind this implementation is the following:
+- Hashes are calculated for each document that should be authenticable and inserted into a database.
+Currently, `.html` and `.pdf` formats are supported.
+- Hashes of `.html` documents are calculated based on the content of their elements which have `tuf-authenticate` class set. This means that a document will stay authentic even if its style is changed.
+Planned improvements include making sure that no parts of the document's authentic content are
+actually invisible (e.g. have a `css` class which sets display to `none`).
+- The database stores hashes of not just the newest, but also of older versions of the document, as well
+as information such as when a version was current.
+- A user who wants to be able to check if a document is authentic or not needs to install a browser extension.
+Currently supported browsers are `Google Chrome`, `Mozilla Firefox` and `Microsoft Edge`.
+- Once a user has installed the extension, they check authenticity of the currently displayed document simply
+by invoking clicking on the extension.
+- The extension sends content of the document to a web server, which then calculates its hash and compares it
+with that document's hashes stored in the database. Documents are identified by their paths e.g. `us/ca/cities/san-mateo/ordinances/2019/7`. The server then returns one of the following replies:
+  - The document is authentic and current, followed by the date when the document became valid.
+  - The document is authentic but not current, followed by the date range when the document was valid.
+  - Not authentic, meaning that none of the document's hashes loaded into the database match the provided one.
+  - Cannot authenticate, meaning that that document is not familiar to the system (its hashes haven't been loaded into the database).
+
+This implementation assumes that all documents are stored in a git repository. That means that the historical
+versions of those documents can be accessed easily. When inserting the hashes into the database, all commits of
+the repository are traversed, starting with the one first one which was not previously processed and stored in
+the database.
 
 ## Requirements
 
