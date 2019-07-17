@@ -78,33 +78,37 @@ def _insert_diff_hashes(repo, prev_commit, current_commit):
       action, file_name = changed_file.split(maxsplit=1)
       path = file_name.replace(os.sep, '/')
       # if file was added or modified, calculate the new hash
-      if file_name.endswith('.html'):
+      file_type = 'html' if file_name.endswith('.html') else 'pdf'
+      if file_type == 'html':
         url = path.rsplit('.', 1)[0]
+      else:
+        url = path
       # if file aready existed and it was modified or deleted update previous hash
       if action != 'A':
         previous_hash = Hash.objects.get(path=url, end_commit__isnull=True)
         previous_hash.end_commit = current_commit
         previous_hash.save()
       if action != 'D':
-        hash_value = _calculate_file_hash(repo, path, current_commit)
+        hash_value = _calculate_file_hash(repo, path, current_commit, file_type)
         if hash_value is not None:
           h = Hash(value=hash_value, path=url, start_commit=current_commit)
           h.save()
 
 
-def _calculate_file_hash(repo, path, commit):
+def _calculate_file_hash(repo, path, commit, file_type):
   # save file content to a temporary file
   file_contents = repo.git.show('{}:{}'.format(commit.sha, path))
   temp_dir = tempfile.gettempdir()
   # the file must have .html extension
   # if that is not the case, the browser will not open it correctly
-  file_path = os.path.join(temp_dir, str(uuid.uuid4()) + '.html')
+  suffix = '.html' if file_type == 'html' else ''
+  file_path = os.path.join(temp_dir, str(uuid.uuid4()) + suffix)
   try:
     with open(file_path, 'wb') as f:
-      f.write(file_contents.encode('utf-8'))
+      f.write(file_contents.encode('utf-8','surrogateescape'))
     if path.endswith('.pdf'):
       return calc_file_hash(file_path)
     else:
       return calc_page_hash(file_path, driver)
   finally:
-     os.remove(file_path)
+    os.remove(file_path)
