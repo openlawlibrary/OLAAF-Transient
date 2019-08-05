@@ -1,13 +1,13 @@
 import hashlib
 from lxml import etree as et
 from .models import Hash, Commit
-from .utils import calc_file_hash, calc_binary_content_hash
+from .utils import calc_file_hash, calc_binary_content_hash, strip_binary_content
 
 # TODO we need to store the information about which edition the document
 # belongs to (and to which repository that edition belongs to)
 
 def check_pdf_authenticity(pdf_content, url):
-  pdf_content = pdf_content.decode('utf-8', 'surrogateescape').strip().encode('utf-8', 'surrogateescape')
+  pdf_content = strip_binary_content(pdf_content)
   pdf_hash = calc_binary_content_hash(pdf_content)
   return check_authenticity(pdf_hash, url)
 
@@ -33,4 +33,4 @@ def check_authenticity(file_hash, url):
         end_commit_date = Commit.objects.get(id=a_hash.end_commit.id).date
         return 'Authentic, but not current.<br/>Valid from {} to {}'.format(start_commit_date,
                                                                             end_commit_date)
-  return 'Not authetnic'
+  return 'Not authentic'

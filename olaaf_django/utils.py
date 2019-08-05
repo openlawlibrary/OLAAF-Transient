@@ -20,7 +20,15 @@ def calc_page_hash(file_path, driver):
   page_source = html.unescape(page_source)
   doc = et.fromstring(page_source, et.HTMLParser())
   body_section = doc.xpath(".//*[contains(@class, 'tuf-authenticate')]")
-  import pdb; pdb.set_trace()
   if body_section:
     return hasher(et.tostring(body_section[0])).hexdigest()
   return None
+
+def strip_binary_content(content):
+  """
+  git show removes an empty line at the end of files, meaning that hash inserted into the database
+  is calculated based on content which does not have that new line.
+  So, it is necessary to remove it from the provided binary content before calculating its hash.
+  surrogateescape is an error handler used to cope with encoding problems.
+  """
+  return content.decode('utf-8', 'surrogateescape').strip().encode('utf-8', 'surrogateescape')
