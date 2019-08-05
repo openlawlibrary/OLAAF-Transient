@@ -54,7 +54,6 @@ setup(
         'GitPython >= 2.1.11',
         'selenium >= 3.141.0',
         'lxml >= 4.3.4',
-        'click==6.7'
     ],
     extras_require={
         'ci': ci_require,

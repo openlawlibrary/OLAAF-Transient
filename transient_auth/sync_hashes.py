@@ -1,7 +1,9 @@
 import os
 import tempfile
 import uuid
+import json
 from git import Repo
+from git.exc import GitError
 from datetime import datetime
 from selenium import webdriver
 from pathlib import Path
@@ -15,6 +17,15 @@ driver = webdriver.Chrome(chrome_options=options)
 EMPTY_TREE_SHA = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 
 def sync_hashes(repo_path):
+  """
+  Given a path of a html repository, traverse through all commits which
+  have not yet been inserted into the database and insert them. For each commit,
+  calculate hashes of all new/modified files and calculates hashes of added files.
+  Update previously calculated hashes of modified and deleted files and set their
+  valid until date.
+  Editions are not supported at the moment.
+  """
+
   repo_path = Path(repo_path)
   repo_name = '{}/{}'.format(repo_path.parent.name, repo_path.name)
   repo = Repo(str(repo_path))
@@ -24,16 +35,10 @@ def sync_hashes(repo_path):
   # since editions are on branches, maybe use them
   # or call this edition by edition
 
-  try:
-    repository = Repository.objects.get(name=repo_name)
+  repository, created = Repository.objects.get_or_create(name=repo_name)
+  edition = None
+  if not created:
     edition = Edition.objects.filter(repository=repository).latest('id')
-  except Repository.DoesNotExist:
-    repository = Repository(name=repo_name)
-    repository.save()
-    edition = None
-  except Repository.MultipleObjectsReturned:
-    print('Multiple repositories of the same name found. That should not be the case.')
-    return
 
   if edition is None:
     # create the initial edition
@@ -58,6 +63,8 @@ def sync_hashes(repo_path):
     prev_commit = inserted_commits[-1]
 
   for commit in repo_commits[inserted_commits_num::]:
+    # get the date from metadata.json. If metadata.json does not exists at that revision
+    # skip the commit
     date = datetime.utcfromtimestamp(commit.committed_date).strftime('%Y-%m-%d %H:%M')
     current_commit = Commit(edition=edition, sha=commit.hexsha, date=date)
     current_commit.save()
@@ -107,7 +114,7 @@ def _calculate_file_hash(repo, path, commit, file_type):
       # the file must have .html extension
       # if that is not the case, the browser will not open it correctly
       with open(file_path, 'wb') as f:
-        f.write(file_contents.encode('utf-8','surrogateescape'))
+        f.write(file_contents.encode('utf-8', 'surrogateescape'))
       file_hash = calc_page_hash(file_path, driver)
     finally:
       os.remove(file_path)
