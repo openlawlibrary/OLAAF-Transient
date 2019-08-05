@@ -31,7 +31,7 @@ ALLOWED_HOSTS = []
 # Application definition
 
 INSTALLED_APPS = [
-    'transient_auth.apps.TransientAuthConfig',
+    'olaaf_django.apps.OLAAFDjangoConfig',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -50,7 +50,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'authsite.urls'
+ROOT_URLCONF = 'olaafsite.urls'
 
 TEMPLATES = [
     {
@@ -68,7 +68,7 @@ TEMPLATES = [
     },
 ]
 
-WSGI_APPLICATION = 'authsite.wsgi.application'
+WSGI_APPLICATION = 'olaafsite.wsgi.application'
 
 
 # Database

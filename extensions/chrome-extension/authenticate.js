@@ -2,7 +2,7 @@ content = new XMLSerializer().serializeToString(document)
 href = window.location.href
 url = new URL(href).pathname
 var xhr = new XMLHttpRequest();
-xhr.open("POST", 'http://localhost:8000/transient_auth/authenticate', true);
+xhr.open("POST", 'http://localhost:8000/_api/authenticate', true);
 
 if (href.endsWith('.pdf')){
   //pdf validation can take some time, so notify the user that it has been initiated

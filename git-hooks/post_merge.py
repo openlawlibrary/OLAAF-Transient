@@ -1,6 +1,6 @@
 import subprocess
 import os
-from transient_auth.sync_hashes import sync_hashes
+from olaaf_django.sync_hashes import sync_hashes
 
 
 def system(*args, **kwargs):
@@ -9,6 +9,6 @@ def system(*args, **kwargs):
   out, err = proc.communicate()
   return out
 
-os.environ.setdefault("DJANGO_SETTINGS_MODULE", "authsite.settings")
+os.environ.setdefault("DJANGO_SETTINGS_MODULE", "olaafsite.settings")
 repo_path = system('git', 'rev-parse', '--show-toplevel').decode().strip()
 sync_hashes(repo_path)

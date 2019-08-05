@@ -1,5 +1,5 @@
 from django.core.management.base import BaseCommand
-from transient_auth.sync_hashes import sync_hashes
+from olaaf_django.sync_hashes import sync_hashes
 
 class Command(BaseCommand):
   help = 'Displays current time'

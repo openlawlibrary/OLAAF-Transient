@@ -20,6 +20,7 @@ def calc_page_hash(file_path, driver):
   page_source = html.unescape(page_source)
   doc = et.fromstring(page_source, et.HTMLParser())
   body_section = doc.xpath(".//*[contains(@class, 'tuf-authenticate')]")
+  import pdb; pdb.set_trace()
   if body_section:
     return hasher(et.tostring(body_section[0])).hexdigest()
   return None

@@ -1,14 +1,12 @@
 import os
 import tempfile
 import uuid
-import json
 from git import Repo
-from git.exc import GitError
 from datetime import datetime
 from selenium import webdriver
 from pathlib import Path
-from transient_auth.models import Commit, Hash, Edition, Repository
-from transient_auth.utils import calc_binary_content_hash, calc_page_hash
+from olaaf_django.models import Commit, Hash, Edition, Repository
+from olaaf_django.utils import calc_binary_content_hash, calc_page_hash
 
 options = webdriver.ChromeOptions()
 options.add_argument("headless")

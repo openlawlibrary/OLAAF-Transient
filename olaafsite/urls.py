@@ -16,7 +16,11 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import path, include
 
+_urlpatterns = [
+  path('admin/', admin.site.urls),
+]
+
 urlpatterns = [
-    path('transient_auth/', include('transient_auth.urls')),
-    path('admin/', admin.site.urls),
+  path('_api/', include('olaaf_django.urls')),
+  path('_authenticate/', include(_urlpatterns)),
 ]
