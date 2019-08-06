@@ -1,16 +1,22 @@
+from .authentication import check_authenticity, AuthetnicationResponse
 from django.http import HttpResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
-from .authentication import check_pdf_authenticity, check_html_authenticity
+from django.template import loader
 
 
 @csrf_exempt
 @require_http_methods(['POST'])
 def authenticate(request):
   url = request.POST.get('url')
-  if url.endswith('.pdf'):
-    pdf = request.FILES['pdf'].file.getvalue()
-    return HttpResponse(check_pdf_authenticity(pdf, url))
-
   content = request.POST.get('content')
-  return HttpResponse(check_html_authenticity(content, url))
+  if content is None:
+    content = request.FILES['content'].file.getvalue()
+  auth_response = check_authenticity(url, content)
+  template = loader.get_template('olaaf_django/response.html')
+  context = {
+    'auth_response': auth_response
+  }
+  resp = template.render(context, request)
+  print(resp)
+  return HttpResponse(resp)

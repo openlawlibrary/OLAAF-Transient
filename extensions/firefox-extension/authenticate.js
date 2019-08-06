@@ -29,7 +29,7 @@ if (href.endsWith('.pdf')){
             }
           }
           var formData = new FormData();
-          formData.append('pdf', blob);
+          formData.append('content', blob);
           formData.append('url', url)
           xhr.send(formData);
       }
