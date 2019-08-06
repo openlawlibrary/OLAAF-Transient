@@ -1,6 +1,8 @@
 import os
 import tempfile
 import uuid
+from django.db.models import Q
+from django.db import transaction
 from git import Repo
 from datetime import datetime
 from selenium import webdriver
@@ -65,7 +67,6 @@ def sync_hashes(repo_path):
     # skip the commit
     date = datetime.utcfromtimestamp(commit.committed_date).strftime('%Y-%m-%d %H:%M')
     current_commit = Commit(edition=edition, sha=commit.hexsha, date=date)
-    current_commit.save()
     _insert_diff_hashes(repo, prev_commit, current_commit)
     prev_commit = current_commit
 
@@ -76,6 +77,9 @@ def _insert_diff_hashes(repo, prev_commit, current_commit):
                                                                              current_commit))
   diff = repo.git.diff('--name-status', prev_commit.sha, current_commit.sha)
   diff_names = diff.split('\n')
+  new_hashes = []
+  query = None
+  end_commits_by_path = {}
   for changed_file in diff_names:
     # we do not want to calculate hashes of index pages, images, json files etc.
     if changed_file.endswith('.html') or changed_file.endswith('.pdf'):
@@ -92,14 +96,33 @@ def _insert_diff_hashes(repo, prev_commit, current_commit):
         url = path
       # if file aready existed and it was modified or deleted update previous hash
       if action != 'A':
-        previous_hash = Hash.objects.get(path=url, end_commit__isnull=True)
-        previous_hash.end_commit = current_commit
-        previous_hash.save()
+        q = Q(path=url, end_commit__isnull=True, id__isnull=False)
+        if query is None:
+          query = q
+        else:
+          query = query | q
+        end_commits_by_path[url] = current_commit
       if action != 'D':
         hash_value = _calculate_file_hash(repo, path, current_commit, file_type)
         if hash_value is not None:
-          h = Hash(value=hash_value, path=url, start_commit=current_commit)
-          h.save()
+          h = Hash(value=hash_value, path=url)
+          new_hashes.append(h)
+
+  updated_hashes = []
+  if query is not None:
+    updated_hashes = Hash.objects.filter(query)[::1]
+
+
+  with transaction.atomic():
+    current_commit.save()
+    if len(new_hashes):
+      for h in new_hashes:
+        h.start_commit = current_commit
+      Hash.objects.bulk_create(new_hashes)
+    if len(updated_hashes):
+      for h in updated_hashes:
+        h.end_commit = end_commits_by_path[h.path]
+      Hash.objects.bulk_update(updated_hashes, ['end_commit'])
 
 
 def _calculate_file_hash(repo, path, commit, file_type):

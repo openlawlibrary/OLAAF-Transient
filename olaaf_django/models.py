@@ -17,10 +17,10 @@ class Edition(models.Model):
   def __str__(self):
     return 'repository={}, name={}, date={}'.format(self.repository, self.name, self.date)
 
-
 class Commit(models.Model):
   sha = models.CharField(max_length=40)
   date = models.DateTimeField()
+  revoked = models.BooleanField(default=True)
   edition = models.ForeignKey(Edition, on_delete=models.CASCADE)
 
   def __str__(self):
