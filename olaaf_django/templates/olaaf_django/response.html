@@ -2,8 +2,8 @@
 Cannot authenticate
 {% else %}
   {% if auth_response.authentic %}
-Authentic{% if auth_response.current %} and {% else %}, but not {% endif %} current.
-Valid from {{ auth_response.from_commit.date }}{% if not auth_response.current %} to {{ auth_response.to_commit.date}}{% endif %}.
+Authentic{% if auth_response.current %} and {% else %}, but not {% endif %}current.
+Valid from {{ auth_response.from_date }}{% if not auth_response.current %} to {{ auth_response.to_date}}{% endif %}.
   {% else %}
 Not authentic
   {% endif %}

@@ -18,5 +18,8 @@ def authenticate(request):
     'auth_response': auth_response
   }
   resp = template.render(context, request)
-  print(resp)
-  return HttpResponse(resp)
+  response =  HttpResponse(resp)
+  # addresses the CORS issue
+  # robably not the best good solution, but allows development
+  response["Access-Control-Allow-Origin"] = "*"
+  return response

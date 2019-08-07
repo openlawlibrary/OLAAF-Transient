@@ -25,7 +25,7 @@ class Edition(models.Model):
 
 class Commit(models.Model):
   sha = models.CharField(max_length=40)
-  date = models.DateTimeField()
+  date = models.CharField(max_length=12)
   revoked = models.BooleanField(default=True)
   edition = models.ForeignKey(Edition, on_delete=models.CASCADE)
 

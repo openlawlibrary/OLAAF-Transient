@@ -63,7 +63,14 @@ def sync_hashes(repo_path):
     prev_commit = inserted_commits[-1]
 
   for commit in repo_commits[inserted_commits_num::]:
-    date = datetime.utcfromtimestamp(commit.committed_date).strftime('%Y-%m-%d %H:%M')
+    # TODO
+    # We should not use commit date here since it has not been authenticated
+    # The date could be a part of the information passed to sync_hashes, see issue #2
+    # Since this is going to be changed soon, not making an effort to check if that date
+    # already exists. We have not yet implemented anything that would be affected by the
+    # missing counter
+    date = datetime.utcfromtimestamp(commit.committed_date)
+    date = '{}-{}-{}'.format(date.year, date.month, date.day)
     current_commit = Commit(edition=edition, sha=commit.hexsha, date=date)
     _insert_diff_hashes(repo, prev_commit, current_commit)
     prev_commit = current_commit
@@ -79,7 +86,6 @@ def _insert_diff_hashes(repo, prev_commit, current_commit):
   query = None
   end_commits_by_path = {}
   for changed_file in diff_names:
-    import pdb; pdb.set_trace()
     # we do not calculate hashes of images, json files etc. at this moment
     if changed_file.endswith('.html') or changed_file.endswith('.pdf'):
       # git diff contains list of entries in the form of
@@ -90,8 +96,14 @@ def _insert_diff_hashes(repo, prev_commit, current_commit):
       # if file was added or modified, calculate the new hash
       file_type = 'html' if file_name.endswith('.html') else 'pdf'
       if file_type == 'html':
-        url = path.rsplit('.', 1)[0]
+        if 'index.html' in path:
+          url = path.split('index.html')[0]
+          if url:
+            url = url.rsplit('/', 1)[0]
+        else:
+          url = path.rsplit('.', 1)[0]
         hash_type = Hash.RENDERED
+
       else:
         url = path
         hash_type = Hash.BITSTREAM
@@ -118,7 +130,10 @@ def _insert_diff_hashes(repo, prev_commit, current_commit):
     if len(new_hashes):
       for h in new_hashes:
         h.start_commit = current_commit
-      Hash.objects.bulk_create(new_hashes)
+      # if a document was changed, but nothing inside the tuf-authenticate
+      # div was changed, hash value will remain the same as before, thus
+      # breaking the path, value unique constraint
+      Hash.objects.bulk_create(new_hashes, ignore_conflicts=True)
     if len(updated_hashes):
       for h in updated_hashes:
         h.end_commit = end_commits_by_path[h.path]
