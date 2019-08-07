@@ -8,7 +8,7 @@ from datetime import datetime
 from selenium import webdriver
 from pathlib import Path
 from olaaf_django.models import Commit, Hash, Edition, Repository
-from olaaf_django.utils import calc_binary_content_hash, calc_page_hash
+from olaaf_django.utils import calc_binary_content_hash, calc_page_hash_and_search_path
 
 options = webdriver.ChromeOptions()
 options.add_argument("headless")
@@ -79,6 +79,7 @@ def _insert_diff_hashes(repo, prev_commit, current_commit):
   query = None
   end_commits_by_path = {}
   for changed_file in diff_names:
+    import pdb; pdb.set_trace()
     # we do not calculate hashes of images, json files etc. at this moment
     if changed_file.endswith('.html') or changed_file.endswith('.pdf'):
       # git diff contains list of entries in the form of
@@ -90,8 +91,10 @@ def _insert_diff_hashes(repo, prev_commit, current_commit):
       file_type = 'html' if file_name.endswith('.html') else 'pdf'
       if file_type == 'html':
         url = path.rsplit('.', 1)[0]
+        hash_type = Hash.RENDERED
       else:
         url = path
+        hash_type = Hash.BITSTREAM
       # if file aready existed and it was modified or deleted update previous hash
       if action != 'A':
         q = Q(path=url, end_commit__isnull=True)
@@ -101,9 +104,9 @@ def _insert_diff_hashes(repo, prev_commit, current_commit):
           query = query | q
         end_commits_by_path[url] = current_commit
       if action != 'D':
-        hash_value = _calculate_file_hash(repo, path, current_commit, file_type)
+        hash_value, search_path = _calculate_file_hash_and_search_path(repo, path, current_commit, file_type)
         if hash_value is not None:
-          h = Hash(value=hash_value, path=url)
+          h = Hash(value=hash_value, path=url, hash_type=hash_type)
           new_hashes.append(h)
 
   updated_hashes = []
@@ -122,7 +125,7 @@ def _insert_diff_hashes(repo, prev_commit, current_commit):
       Hash.objects.bulk_update(updated_hashes, ['end_commit'])
 
 
-def _calculate_file_hash(repo, path, commit, file_type):
+def _calculate_file_hash_and_search_path(repo, path, commit, file_type):
   # save file content to a temporary file
   file_contents = repo.git.show('{}:{}'.format(commit.sha, path))
   temp_dir = tempfile.gettempdir()
@@ -133,10 +136,11 @@ def _calculate_file_hash(repo, path, commit, file_type):
       # if that is not the case, the browser will not open it correctly
       with open(file_path, 'wb') as f:
         f.write(file_contents.encode('utf-8', 'surrogateescape'))
-      file_hash = calc_page_hash(file_path, driver)
+      file_hash, search_path = calc_page_hash_and_search_path(file_path, driver)
     finally:
       os.remove(file_path)
   else:
+    search_path = None
     file_contents = file_contents.strip().encode('utf-8', 'surrogateescape')
     file_hash = calc_binary_content_hash(file_contents)
-  return file_hash
+  return file_hash, search_path

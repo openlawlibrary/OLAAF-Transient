@@ -50,13 +50,12 @@ class Hash(models.Model):
   start_commit = models.ForeignKey(Commit, on_delete=models.CASCADE, related_name='hash_start_commit')
   end_commit = models.ForeignKey(Commit, on_delete=models.SET_NULL, null=True, related_name='hash_end_commit')
   hash_type = models.CharField(max_length=1, choices=TYPE_CHOICES, default=BITSTREAM)
+  search_path = models.CharField(max_length=200)
 
   class Meta:
     unique_together = ('path', 'value')
     indexes = [
-      models.Index(fields=['path', 'value']),
-      models.Index(fields=['start_commit']),
-      models.Index(fields=['end_commit'])
+      models.Index(fields=['path', 'value'])
     ]
 
   def __str__(self):

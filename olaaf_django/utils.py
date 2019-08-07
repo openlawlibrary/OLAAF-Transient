@@ -12,7 +12,7 @@ def calc_file_hash(file_path):
 def calc_binary_content_hash(content):
   return hasher(content).hexdigest()
 
-def calc_page_hash(file_path, driver):
+def calc_page_hash_and_search_path(file_path, driver):
   file_path = os.path.abspath(file_path)
   driver.get(f'file://{file_path}')
   page_source = driver.page_source
@@ -21,8 +21,11 @@ def calc_page_hash(file_path, driver):
   doc = et.fromstring(page_source, et.HTMLParser())
   body_section = doc.xpath(".//*[contains(@class, 'tuf-authenticate')]")
   if body_section:
-    return hasher(et.tostring(body_section[0])).hexdigest()
-  return None
+    value = hasher(et.tostring(body_section[0])).hexdigest()
+    # find search path
+    search_path = doc.xpath('.//@data-search-path')[-1]
+    return value, search_path
+  return None, None
 
 def strip_binary_content(content):
   """
