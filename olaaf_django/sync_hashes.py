@@ -63,8 +63,6 @@ def sync_hashes(repo_path):
     prev_commit = inserted_commits[-1]
 
   for commit in repo_commits[inserted_commits_num::]:
-    # get the date from metadata.json. If metadata.json does not exists at that revision
-    # skip the commit
     date = datetime.utcfromtimestamp(commit.committed_date).strftime('%Y-%m-%d %H:%M')
     current_commit = Commit(edition=edition, sha=commit.hexsha, date=date)
     _insert_diff_hashes(repo, prev_commit, current_commit)
@@ -81,7 +79,7 @@ def _insert_diff_hashes(repo, prev_commit, current_commit):
   query = None
   end_commits_by_path = {}
   for changed_file in diff_names:
-    # we do not want to calculate hashes of index pages, images, json files etc.
+    # we do not calculate hashes of images, json files etc. at this moment
     if changed_file.endswith('.html') or changed_file.endswith('.pdf'):
       # git diff contains list of entries in the form of
       # M/A file_name.html
@@ -96,7 +94,7 @@ def _insert_diff_hashes(repo, prev_commit, current_commit):
         url = path
       # if file aready existed and it was modified or deleted update previous hash
       if action != 'A':
-        q = Q(path=url, end_commit__isnull=True, id__isnull=False)
+        q = Q(path=url, end_commit__isnull=True)
         if query is None:
           query = q
         else:
@@ -111,7 +109,6 @@ def _insert_diff_hashes(repo, prev_commit, current_commit):
   updated_hashes = []
   if query is not None:
     updated_hashes = Hash.objects.filter(query)[::1]
-
 
   with transaction.atomic():
     current_commit.save()
