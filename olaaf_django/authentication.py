@@ -7,10 +7,10 @@ from .utils import calc_hash, strip_binary_content, get_html_document, \
 # TODO we need to store the information about which edition the document
 # belongs to (and to which repository that edition belongs to)
 
-def check_authenticity(url, content):
-  if not url.startwith('/'):
-    url = '/' + url
-  content_type, _ = mimetypes.guess_type(url)
+def check_authenticity(path, content):
+  if not path.startswith('/'):
+    path = '/' + path
+  content_type, _ = mimetypes.guess_type(path)
   file_type = content_type.split('/')[1] if content_type is not None else 'html'
   hashing_func = {
     'html': _calculate_html_hash,
@@ -22,7 +22,8 @@ def check_authenticity(url, content):
 
   hash_value = hashing_func(content)
   try:
-    hash_obj = Hash.objects.get(path=path, value=hash_value, hash_type=Hash.RENDERED)
+    hash_type = Hash.RENDERED if file_type == 'html' else Hash.BITSTREAM
+    hash_obj = Hash.objects.get(path=path, value=hash_value, hash_type=hash_type)
     start_commit_date = Commit.objects.get(id=hash_obj.start_commit.id).date
     if hash_obj.end_commit is None:
       return AuthetnicationResponse(path, authentic=True, current=True, from_date=start_commit_date)

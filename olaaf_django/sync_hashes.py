@@ -114,10 +114,10 @@ def _insert_diff_hashes(repo, prev_commit, current_commit):
 
     if git_commit is not None:
       file_content = repo.git.show('{}:{}'.format(git_commit.sha, posix_path))
-      file_content = file_content.encode('utf-8', 'surrogateescape')
+      file_content = file_content.strip().encode('utf-8', 'surrogateescape')
 
     # if file was added or modified, calculate the new hash
-    url = None
+    url = '/' + posix_path
     if file_type == 'html':
       doc = _get_document(file_content)
       # try to get url based on content of the url property
@@ -125,8 +125,8 @@ def _insert_diff_hashes(repo, prev_commit, current_commit):
       if meta_url:
         url = meta_url[0].get('content')
         url = urlparse(url).path
-    if url is None:
-      url = _calculate_html_url('/' + posix_path)
+      else:
+        url = _calculate_html_url(url)
 
     # if file aready existed and it was modified or deleted update previous hash
     if action != 'A':
@@ -155,6 +155,11 @@ def _insert_diff_hashes(repo, prev_commit, current_commit):
 
   with transaction.atomic():
     current_commit.save()
+    if query is not None:
+      hashes_to_update = Hash.objects.filter(query).iterator()  # default batch size 2000
+      hashes_pending_update = (update_hash(h) for h in hashes_to_update)
+      Hash.objects.bulk_update(hashes_pending_update, ['end_commit'], batch_size=2000)
+
     if len(new_hashes):
       for h in new_hashes:
         h.start_commit = current_commit
@@ -163,12 +168,6 @@ def _insert_diff_hashes(repo, prev_commit, current_commit):
       # breaking the path, value unique constraint
       # TODO see which hashes couldn't be inserted and don't update the old hashes
       Hash.objects.bulk_create(new_hashes, ignore_conflicts=True)
-
-    if query is not None:
-      hashes_to_update = Hash.objects.filter(query).iterator()  # default batch size 2000
-      hashes_pending_update = (update_hash(h) for h in hashes_to_update)
-      Hash.objects.bulk_update(hashes_pending_update, ['end_commit'], batch_size=2000)
-
 
 def _get_document(file_content):
   temp_dir = Path(tempfile.gettempdir())
