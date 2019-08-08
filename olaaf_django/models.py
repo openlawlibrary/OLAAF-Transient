@@ -26,7 +26,7 @@ class Edition(models.Model):
 class Commit(models.Model):
   sha = models.CharField(max_length=40)
   date = models.CharField(max_length=12)
-  revoked = models.BooleanField(default=True)
+  revoked = models.BooleanField(default=False)
   edition = models.ForeignKey(Edition, on_delete=models.CASCADE)
 
   class Meta:
@@ -53,9 +53,9 @@ class Hash(models.Model):
   search_path = models.CharField(max_length=200)
 
   class Meta:
-    unique_together = ('path', 'value')
+    unique_together = ('path', 'value', 'hash_type')
     indexes = [
-      models.Index(fields=['path', 'value'])
+      models.Index(fields=['path', 'value', 'hash_type'])
     ]
 
   def __str__(self):
