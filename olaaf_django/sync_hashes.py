@@ -7,14 +7,19 @@ from git import Repo
 from datetime import datetime
 from selenium import webdriver
 from pathlib import Path
+from urllib.parse import urlparse
+from lxml import etree as et
 from olaaf_django.models import Commit, Hash, Edition, Repository
-from olaaf_django.utils import calc_binary_content_hash, calc_page_hash_and_search_path
+from olaaf_django.utils import calc_hash, get_auth_div_content, get_html_document
+
 
 options = webdriver.ChromeOptions()
 options.add_argument("headless")
 driver = webdriver.Chrome(chrome_options=options)
 
 EMPTY_TREE_SHA = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
+# currently supported file types
+SUPPORTED_TYPES = ['html', 'pdf']
 
 def sync_hashes(repo_path):
   """
@@ -69,8 +74,7 @@ def sync_hashes(repo_path):
     # Since this is going to be changed soon, not making an effort to check if that date
     # already exists. We have not yet implemented anything that would be affected by the
     # missing counter
-    date = datetime.utcfromtimestamp(commit.committed_date)
-    date = '{}-{}-{}'.format(date.year, date.month, date.day)
+    date = datetime.utcfromtimestamp(commit.committed_date).date()
     current_commit = Commit(edition=edition, sha=commit.hexsha, date=date)
     _insert_diff_hashes(repo, prev_commit, current_commit)
     prev_commit = current_commit
@@ -84,46 +88,70 @@ def _insert_diff_hashes(repo, prev_commit, current_commit):
   diff_names = diff.split('\n')
   new_hashes = []
   query = None
-  end_commits_by_path = {}
   for changed_file in diff_names:
-    # we do not calculate hashes of images, json files etc. at this moment
-    if changed_file.endswith('.html') or changed_file.endswith('.pdf'):
-      # git diff contains list of entries in the form of
-      # M/A file_name.html
-      # so remove the modified/added indicator (first letter) and whitespaces
-      action, file_name = changed_file.split(maxsplit=1)
-      path = file_name.replace(os.sep, '/')
-      # if file was added or modified, calculate the new hash
-      file_type = 'html' if file_name.endswith('.html') else 'pdf'
-      if file_type == 'html':
-        if 'index.html' in path:
-          url = path.split('index.html')[0]
-          if url:
-            url = url.rsplit('/', 1)[0]
-        else:
-          url = path.rsplit('.', 1)[0]
-        hash_type = Hash.RENDERED
+    # git diff contains list of entries in the form of
+    # M/A/D file_path
+    action, file_path = changed_file.split(maxsplit=1)
+    file_path = Path(file_path)
+    file_type = file_path.suffix.strip('.')
 
+    if file_type not in SUPPORTED_TYPES:
+      continue
+
+    # load file at revision
+    posix_path = file_path.as_posix()
+
+    # read content of the file at the current revision, unless that files was
+    # just deleted
+    # if a html file was deleted, we still need to load it in order to
+    # get content of the url property
+    # use the previous commit in that case
+    git_commit = None
+    if action != 'D':
+      git_commit = current_commit
+    elif file_type == 'html':
+      git_commit = prev_commit
+
+    if git_commit is not None:
+      file_content = repo.git.show('{}:{}'.format(git_commit.sha, posix_path))
+      file_content = file_content.encode('utf-8', 'surrogateescape')
+
+    # if file was added or modified, calculate the new hash
+    url = None
+    if file_type == 'html':
+      doc = _get_document(file_content)
+      # try to get url based on content of the url property
+      meta_url = doc.xpath(".//*[contains(@property, 'og:url')]")
+      if meta_url:
+        url = meta_url[0].get('content')
+        url = urlparse(url).path
+    if url is None:
+      url = _calculate_html_url('/' + posix_path)
+
+    # if file aready existed and it was modified or deleted update previous hash
+    if action != 'A':
+      q = Q(path=url, end_commit__isnull=True)
+      if query is None:
+        query = q
       else:
-        url = path
-        hash_type = Hash.BITSTREAM
-      # if file aready existed and it was modified or deleted update previous hash
-      if action != 'A':
-        q = Q(path=url, end_commit__isnull=True)
-        if query is None:
-          query = q
-        else:
-          query = query | q
-        end_commits_by_path[url] = current_commit
-      if action != 'D':
-        hash_value, search_path = _calculate_file_hash_and_search_path(repo, path, current_commit, file_type)
-        if hash_value is not None:
-          h = Hash(value=hash_value, path=url, hash_type=hash_type)
-          new_hashes.append(h)
+        query = query | q
 
-  updated_hashes = []
-  if query is not None:
-    updated_hashes = Hash.objects.filter(query)[::1]
+    if action != 'D':
+      if file_type == 'html':
+        auth_div = get_auth_div_content(doc)
+        if auth_div is not None:
+          rendered_hash = calc_hash(et.tostring(auth_div))
+          search_path = doc.xpath('.//@data-search-path')[-1]
+          h = Hash(value=rendered_hash, path=url, hash_type=Hash.RENDERED, search_path=search_path)
+          new_hashes.append(h)
+      # calculate bitstream hash
+      hash_value = calc_hash(file_content)
+      h = Hash(value=hash_value, path=url, hash_type=Hash.BITSTREAM)
+      new_hashes.append(h)
+
+  def update_hash(h):
+    h.end_commit = current_commit
+    return h
 
   with transaction.atomic():
     current_commit.save()
@@ -133,29 +161,33 @@ def _insert_diff_hashes(repo, prev_commit, current_commit):
       # if a document was changed, but nothing inside the tuf-authenticate
       # div was changed, hash value will remain the same as before, thus
       # breaking the path, value unique constraint
+      # TODO see which hashes couldn't be inserted and don't update the old hashes
       Hash.objects.bulk_create(new_hashes, ignore_conflicts=True)
-    if len(updated_hashes):
-      for h in updated_hashes:
-        h.end_commit = end_commits_by_path[h.path]
-      Hash.objects.bulk_update(updated_hashes, ['end_commit'])
+
+    if query is not None:
+      hashes_to_update = Hash.objects.filter(query).iterator()  # default batch size 2000
+      hashes_pending_update = (update_hash(h) for h in hashes_to_update)
+      Hash.objects.bulk_update(hashes_pending_update, ['end_commit'], batch_size=2000)
 
 
-def _calculate_file_hash_and_search_path(repo, path, commit, file_type):
-  # save file content to a temporary file
-  file_contents = repo.git.show('{}:{}'.format(commit.sha, path))
-  temp_dir = tempfile.gettempdir()
-  if file_type == 'html':
-    file_path = os.path.join(temp_dir, str(uuid.uuid4()) + '.html')
-    try:
-      # the file must have .html extension
-      # if that is not the case, the browser will not open it correctly
-      with open(file_path, 'wb') as f:
-        f.write(file_contents.encode('utf-8', 'surrogateescape'))
-      file_hash, search_path = calc_page_hash_and_search_path(file_path, driver)
-    finally:
-      os.remove(file_path)
-  else:
-    search_path = None
-    file_contents = file_contents.strip().encode('utf-8', 'surrogateescape')
-    file_hash = calc_binary_content_hash(file_contents)
-  return file_hash, search_path
+def _get_document(file_content):
+  temp_dir = Path(tempfile.gettempdir())
+  # the file must have .html extension
+  # if that is not the case, the browser will not open it correctly
+  file_path = (temp_dir / (str(uuid.uuid4()) + '.html')).resolve()
+  try:
+    with open(str(file_path), 'wb') as f:
+      f.write(file_content)
+    driver.get(f'file://{file_path}')
+    page_source = driver.page_source
+    return get_html_document(page_source)
+  finally:
+    file_path.unlink()
+
+
+def _calculate_html_url(path):
+  if 'index.html' in path:
+    url = path.split('index.html')[0]
+    if url:
+      return url.rsplit('/', 1)[0]
+  return path.rsplit('.', 1)[0]

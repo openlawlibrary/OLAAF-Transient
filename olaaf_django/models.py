@@ -25,14 +25,16 @@ class Edition(models.Model):
 
 class Commit(models.Model):
   sha = models.CharField(max_length=40)
-  date = models.CharField(max_length=12)
+  date = models.DateField()
+  document = models.CharField(max_length=100)
   revoked = models.BooleanField(default=False)
   edition = models.ForeignKey(Edition, on_delete=models.CASCADE)
 
   class Meta:
-    unique_together = ('edition', 'sha')
+    unique_together = [('edition', 'sha')] # not ready to add this yet ('date', 'document')] 
     indexes = [
-      models.Index(fields=['edition', 'sha'])
+      models.Index(fields=['edition', 'sha']),
+      models.Index(fields=['date', 'id'])
     ]
 
   def __str__(self):
@@ -59,6 +61,7 @@ class Hash(models.Model):
     ]
 
   def __str__(self):
-    return 'path={}, hash={}, start_commit={}, end_commit={}'.format(self.path, self.value,
-                                                                     self.start_commit,
-                                                                     self.end_commit)
+    return 'path={}, hash={}, start_commit={}, end_commit={}, type={}'.format(self.path, self.value,
+                                                                       self.start_commit,
+                                                                       self.end_commit,
+                                                                       self.hash_type)
