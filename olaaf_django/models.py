@@ -31,7 +31,7 @@ class Commit(models.Model):
   edition = models.ForeignKey(Edition, on_delete=models.CASCADE)
 
   class Meta:
-    unique_together = [('edition', 'sha')] # not ready to add this yet ('date', 'document')] 
+    unique_together = [('edition', 'sha')] # not ready to add this yet ('date', 'document')]
     indexes = [
       models.Index(fields=['edition', 'sha']),
       models.Index(fields=['date', 'id'])
@@ -39,6 +39,27 @@ class Commit(models.Model):
 
   def __str__(self):
     return 'sha={}, date={}'.format(self.sha, self.date)
+
+
+class Path(models.Model):
+  filesystem = models.CharField(max_length=260)
+  url = models.CharField(max_length=260)
+  citation = models.CharField(max_length=100, null=True)
+  edition = models.ForeignKey(Edition, on_delete=models.CASCADE)
+
+  class Meta:
+    unique_together = ('filesystem', 'edition')
+    indexes = [
+      models.Index(fields=['filesystem', 'edition']),
+      models.Index(fields=['url', 'edition'])
+    ]
+
+  def __str__(self):
+    return 'filesystem path: {}, url={}, citation={}, edition={}'.format(self.filesystem,
+                                                                         self.url,
+                                                                         self.citation,
+                                                                         self.edition)
+
 
 class Hash(models.Model):
   BITSTREAM = 'B'
@@ -48,7 +69,7 @@ class Hash(models.Model):
     (RENDERED, 'Rendered')
   ]
   value = models.CharField(max_length=64, validators=[MinLengthValidator(64)])
-  path = models.CharField(max_length=200)
+  path = models.ForeignKey(Path, on_delete=models.CASCADE)
   start_commit = models.ForeignKey(Commit, on_delete=models.CASCADE, related_name='hash_start_commit')
   end_commit = models.ForeignKey(Commit, on_delete=models.SET_NULL, null=True, related_name='hash_end_commit')
   hash_type = models.CharField(max_length=1, choices=TYPE_CHOICES, default=BITSTREAM)

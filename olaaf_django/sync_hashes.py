@@ -1,16 +1,16 @@
-import os
 import tempfile
 import uuid
+import pathlib
 from django.db.models import Q
 from django.db import transaction
 from git import Repo
 from datetime import datetime
 from selenium import webdriver
-from pathlib import Path
 from urllib.parse import urlparse
 from lxml import etree as et
-from olaaf_django.models import Commit, Hash, Edition, Repository
+from olaaf_django.models import Commit, Path, Hash, Edition, Repository
 from olaaf_django.utils import calc_hash, get_auth_div_content, get_html_document
+from collections import defaultdict
 
 
 options = webdriver.ChromeOptions()
@@ -20,6 +20,7 @@ driver = webdriver.Chrome(chrome_options=options)
 EMPTY_TREE_SHA = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 # currently supported file types
 SUPPORTED_TYPES = ['html', 'pdf']
+
 
 def sync_hashes(repo_path):
   """
@@ -31,7 +32,7 @@ def sync_hashes(repo_path):
   Editions are not supported at the moment.
   """
 
-  repo_path = Path(repo_path)
+  repo_path = pathlib.Path(repo_path)
   repo_name = '{}/{}'.format(repo_path.parent.name, repo_path.name)
   repo = Repo(str(repo_path))
   repo_commits = list(repo.iter_commits('master'))[::-1]
@@ -76,65 +77,58 @@ def sync_hashes(repo_path):
     # missing counter
     date = datetime.utcfromtimestamp(commit.committed_date).date()
     current_commit = Commit(edition=edition, sha=commit.hexsha, date=date)
-    _insert_diff_hashes(repo, prev_commit, current_commit)
+    _insert_diff_hashes(edition, repo, prev_commit, current_commit)
     prev_commit = current_commit
 
 
-def _insert_diff_hashes(repo, prev_commit, current_commit):
+def _insert_diff_hashes(edition, repo, prev_commit, current_commit):
 
   print('Inserting diff hashes. Previous commit {} current commit {}'.format(prev_commit,
                                                                              current_commit))
   diff = repo.git.diff('--name-status', prev_commit.sha, current_commit.sha)
   diff_names = diff.split('\n')
+  added_files_paths = []
+  hashes_query = None
+  previous_hashes_query = None
+  doc = None
+  hashes_by_paths = defaultdict(list)
   new_hashes = []
-  query = None
+
   for changed_file in diff_names:
     # git diff contains list of entries in the form of
     # M/A/D file_path
     action, file_path = changed_file.split(maxsplit=1)
-    file_path = Path(file_path)
+    file_path = pathlib.Path(file_path)
     file_type = file_path.suffix.strip('.')
-
     if file_type not in SUPPORTED_TYPES:
       continue
-
-    # load file at revision
     posix_path = file_path.as_posix()
 
-    # read content of the file at the current revision, unless that files was
-    # just deleted
-    # if a html file was deleted, we still need to load it in order to
-    # get content of the url property
-    # use the previous commit in that case
-    git_commit = None
+    # Unless the file was deleted, we need to read its content in order to calculate
+    # its hash(es) and, if the file is a html file which was added, to read its url
     if action != 'D':
-      git_commit = current_commit
-    elif file_type == 'html':
-      git_commit = prev_commit
-
-    if git_commit is not None:
-      file_content = repo.git.show('{}:{}'.format(git_commit.sha, posix_path))
+      file_content = repo.git.show('{}:{}'.format(current_commit.sha, posix_path))
       file_content = file_content.strip().encode('utf-8', 'surrogateescape')
 
-    # if file was added or modified, calculate the new hash
-    url = '/' + posix_path
-    if file_type == 'html':
-      doc = _get_document(file_content)
-      # try to get url based on content of the url property
-      meta_url = doc.xpath(".//*[contains(@property, 'og:url')]")
-      if meta_url:
-        url = meta_url[0].get('content')
-        url = urlparse(url).path
-      else:
-        url = _calculate_html_url(url)
+      if file_type == 'html':
+        # If the file is a html file, get the document object so that it's possible to find
+        # elements such as authentication div, search path and url
+        doc = _get_document(file_content)
 
-    # if file aready existed and it was modified or deleted update previous hash
-    if action != 'A':
-      q = Q(path=url, end_commit__isnull=True)
-      if query is None:
-        query = q
+    if action == 'A':
+      # If a new file was added, create a new path object. Calculating url here might be unnecessary
+      # (in cases when the path already exists), but it's probably better to do that than to have
+      # to store doc object to be used later. It is probably far more likely that the path
+      # will have to be created than not
+      url = _get_url(posix_path, file_type, doc)
+      added_files_paths.append({'filesystem': posix_path, 'url': url, 'edition': edition})
+    else:
+      # If the file was modified or deleted, it is necessary to update its latest hash
+      hash_query = Q(path__filesystem=posix_path, end_commit__isnull=True)
+      if hashes_query is None:
+        hashes_query = hash_query
       else:
-        query = query | q
+        hashes_query = hashes_query | hash_query
 
     if action != 'D':
       if file_type == 'html':
@@ -142,12 +136,14 @@ def _insert_diff_hashes(repo, prev_commit, current_commit):
         if auth_div is not None:
           rendered_hash = calc_hash(et.tostring(auth_div))
           search_path = doc.xpath('.//@data-search-path')[-1]
-          h = Hash(value=rendered_hash, path=url, hash_type=Hash.RENDERED, search_path=search_path)
+          h = Hash(value=rendered_hash, hash_type=Hash.RENDERED, search_path=search_path)
+          hashes_by_paths[posix_path].append(h)
           new_hashes.append(h)
       # calculate bitstream hash
       hash_value = calc_hash(file_content)
-      h = Hash(value=hash_value, path=url, hash_type=Hash.BITSTREAM)
+      h = Hash(value=hash_value, hash_type=Hash.BITSTREAM)
       new_hashes.append(h)
+      hashes_by_paths[posix_path].append(h)
 
   def update_hash(h):
     h.end_commit = current_commit
@@ -155,22 +151,42 @@ def _insert_diff_hashes(repo, prev_commit, current_commit):
 
   with transaction.atomic():
     current_commit.save()
-    if query is not None:
-      hashes_to_update = Hash.objects.filter(query).iterator()  # default batch size 2000
-      hashes_pending_update = (update_hash(h) for h in hashes_to_update)
+
+    if hashes_query is not None:
+      hashes_to_update = Hash.objects.filter(hashes_query).iterator()  # default batch size 2000
+      hashes_pending_update = []
+      for h in hashes_to_update:
+        hashes_by_path = hashes_by_paths.get(h.path.filesystem)
+        if hashes_by_path is not None:
+          for new_hash in hashes_by_path:
+            if new_hash.hash_type == Hash.RENDERED and new_hash.value == h.value:
+              new_hashes.remove(new_hash)
+            else:
+              new_hash.path = h.path
+              h.end_commit = current_commit
+              hashes_pending_update.append(h)
+              new_hash.start_commit = current_commit
+        else:
+          # file deleted
+          h.end_commit = current_commit
+          hashes_pending_update.append(h)
+
+
+      #hashes_pending_update = (update_hash(h) for h in hashes_to_update)
       Hash.objects.bulk_update(hashes_pending_update, ['end_commit'], batch_size=2000)
 
-    if len(new_hashes):
-      for h in new_hashes:
-        h.start_commit = current_commit
-      # if a document was changed, but nothing inside the tuf-authenticate
-      # div was changed, hash value will remain the same as before, thus
-      # breaking the path, value unique constraint
-      # TODO see which hashes couldn't be inserted and don't update the old hashes
-      Hash.objects.bulk_create(new_hashes, ignore_conflicts=True)
+    if added_files_paths:
+      for path in added_files_paths:
+        db_path, _ = Path.objects.get_or_create(**path)
+        for h in hashes_by_paths[db_path.filesystem]:
+          h.path = db_path
+          h.start_commit = current_commit
+
+      Hash.objects.bulk_create(new_hashes)
+
 
 def _get_document(file_content):
-  temp_dir = Path(tempfile.gettempdir())
+  temp_dir = pathlib.Path(tempfile.gettempdir())
   # the file must have .html extension
   # if that is not the case, the browser will not open it correctly
   file_path = (temp_dir / (str(uuid.uuid4()) + '.html')).resolve()
@@ -182,6 +198,21 @@ def _get_document(file_content):
     return get_html_document(page_source)
   finally:
     file_path.unlink()
+
+
+def _get_url(posix_path, file_type, doc):
+    url = '/' + posix_path
+    if file_type != 'html':
+      return url
+
+    # try to get url based on content of the url property
+    meta_url = doc.xpath(".//*[contains(@property, 'og:url')]")
+    if meta_url is not None:
+      url = meta_url[0].get('content')
+      url = urlparse(url).path
+    else:
+      url = _calculate_html_url(url)
+    return url
 
 
 def _calculate_html_url(path):
