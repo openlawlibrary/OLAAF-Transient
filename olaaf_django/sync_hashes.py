@@ -10,7 +10,6 @@ from urllib.parse import urlparse
 from lxml import etree as et
 from olaaf_django.models import Commit, Path, Hash, Edition, Repository
 from olaaf_django.utils import calc_hash, get_auth_div_content, get_html_document
-from collections import defaultdict
 
 
 options = webdriver.ChromeOptions()
@@ -92,9 +91,8 @@ def _insert_diff_hashes(edition, repo, prev_commit, current_commit):
   # query hashes which were updated or deleted
   hashes_query = None
   doc = None
-  # a dictionary which maps paths to hashes
-  # that is, to another dictionary which separates the two types of hashes
-  hashes_by_paths = defaultdict(dict)
+  # a dictionary which maps path, type tuples to hashes
+  hashes_by_paths_and_types = {}
   # keep track of new hashes which should be inserted into the database
   new_hashes = []
 
@@ -144,13 +142,12 @@ def _insert_diff_hashes(edition, repo, prev_commit, current_commit):
           rendered_hash = calc_hash(et.tostring(auth_div))
           search_path = doc.xpath('.//@data-search-path')[-1]
           h = Hash(value=rendered_hash, hash_type=Hash.RENDERED, search_path=search_path)
-          hashes_by_paths[posix_path][h.hash_type] = h
-          new_hashes.append(h)
+          hashes_by_paths_and_types[(posix_path, Hash.RENDERED)] = h
+
       # calculate bitstream hash
       hash_value = calc_hash(file_content)
       h = Hash(value=hash_value, hash_type=Hash.BITSTREAM)
-      new_hashes.append(h)
-      hashes_by_paths[posix_path][h.hash_type] = h
+      hashes_by_paths_and_types[(posix_path, Hash.BITSTREAM)] = h
 
 
   with transaction.atomic():
@@ -161,14 +158,14 @@ def _insert_diff_hashes(edition, repo, prev_commit, current_commit):
       hashes_to_update = Hash.objects.filter(hashes_query).iterator()  # default batch size 2000
       hashes_pending_update = []
       for h in hashes_to_update:
-        hashes_by_path = hashes_by_paths.get(h.path.filesystem)
-        if hashes_by_path is not None:
+        path_and_hash = (h.path.filesystem, h.hash_type)
+        new_hash = hashes_by_paths_and_types.get(path_and_hash)
+        if new_hash is not None:
           # hash was modified
-          new_hash = hashes_by_path[h.hash_type]
           if new_hash.value == h.value:
-            # do not update the existing hash and insert a new one if it has not changed
+            # do not update the existing hash and insert a new one if it remained unchanged
             # this can only happen in case of rendered hashes
-            new_hashes.remove(new_hash)
+            del hashes_by_paths_and_types[path_and_hash]
           else:
             new_hash.path = h.path
             new_hash.start_commit = current_commit
@@ -179,7 +176,6 @@ def _insert_diff_hashes(edition, repo, prev_commit, current_commit):
           h.end_commit = current_commit
           hashes_pending_update.append(h)
 
-
       Hash.objects.bulk_update(hashes_pending_update, ['end_commit'], batch_size=2000)
 
     if added_files_paths:
@@ -187,12 +183,14 @@ def _insert_diff_hashes(edition, repo, prev_commit, current_commit):
         # when inside a transaction, this should also be executed in batches
         # see https://stackoverflow.com/questions/3395236/aggregating-saves-in-django
         db_path, _ = Path.objects.get_or_create(**path)
-        for h in hashes_by_paths[db_path.filesystem]:
-          h.path = db_path
-          h.start_commit = current_commit
+        for hash_type in (Hash.RENDERED, Hash.BITSTREAM):
+          h = hashes_by_paths_and_types.get((db_path.filesystem, hash_type))
+          if h is not None:
+            h.path = db_path
+            h.start_commit = current_commit
 
     # insert all new hashes (corresponding to both new and modified files) into the database
-    Hash.objects.bulk_create(new_hashes)
+    Hash.objects.bulk_create(hashes_by_paths_and_types.values())
 
 
 def _get_document(file_content):

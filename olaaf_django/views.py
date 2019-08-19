@@ -1,4 +1,4 @@
-from .authentication import check_authenticity, AuthetnicationResponse
+from .authentication import check_authenticity
 from django.http import HttpResponse
 from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
@@ -18,7 +18,7 @@ def authenticate(request):
     'auth_response': auth_response
   }
   resp = template.render(context, request)
-  response =  HttpResponse(resp)
+  response = HttpResponse(resp)
   # addresses the CORS issue
   # robably not the best good solution, but allows development
   response["Access-Control-Allow-Origin"] = "*"
