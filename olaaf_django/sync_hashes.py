@@ -85,14 +85,21 @@ def _insert_diff_hashes(edition, repo, prev_commit, current_commit):
 
   print('Inserting diff hashes. Previous commit {} current commit {}'.format(prev_commit,
                                                                              current_commit))
+
+  # keep track of paths of new files
+  # these path have to be inserted into the database
+  added_files_paths = []
+  # query hashes which were updated or deleted
+  hashes_query = None
+  doc = None
+  # a dictionary which maps paths to hashes
+  # that is, to another dictionary which separates the two types of hashes
+  hashes_by_paths = defaultdict(dict)
+  # keep track of new hashes which should be inserted into the database
+  new_hashes = []
+
   diff = repo.git.diff('--name-status', prev_commit.sha, current_commit.sha)
   diff_names = diff.split('\n')
-  added_files_paths = []
-  hashes_query = None
-  previous_hashes_query = None
-  doc = None
-  hashes_by_paths = defaultdict(list)
-  new_hashes = []
 
   for changed_file in diff_names:
     # git diff contains list of entries in the form of
@@ -137,52 +144,55 @@ def _insert_diff_hashes(edition, repo, prev_commit, current_commit):
           rendered_hash = calc_hash(et.tostring(auth_div))
           search_path = doc.xpath('.//@data-search-path')[-1]
           h = Hash(value=rendered_hash, hash_type=Hash.RENDERED, search_path=search_path)
-          hashes_by_paths[posix_path].append(h)
+          hashes_by_paths[posix_path][h.hash_type] = h
           new_hashes.append(h)
       # calculate bitstream hash
       hash_value = calc_hash(file_content)
       h = Hash(value=hash_value, hash_type=Hash.BITSTREAM)
       new_hashes.append(h)
-      hashes_by_paths[posix_path].append(h)
+      hashes_by_paths[posix_path][h.hash_type] = h
 
-  def update_hash(h):
-    h.end_commit = current_commit
-    return h
 
   with transaction.atomic():
     current_commit.save()
 
     if hashes_query is not None:
+      # find all hashes which were modified or deleted
       hashes_to_update = Hash.objects.filter(hashes_query).iterator()  # default batch size 2000
       hashes_pending_update = []
       for h in hashes_to_update:
         hashes_by_path = hashes_by_paths.get(h.path.filesystem)
         if hashes_by_path is not None:
-          for new_hash in hashes_by_path:
-            if new_hash.hash_type == Hash.RENDERED and new_hash.value == h.value:
-              new_hashes.remove(new_hash)
-            else:
-              new_hash.path = h.path
-              h.end_commit = current_commit
-              hashes_pending_update.append(h)
-              new_hash.start_commit = current_commit
+          # hash was modified
+          new_hash = hashes_by_path[h.hash_type]
+          if new_hash.value == h.value:
+            # do not update the existing hash and insert a new one if it has not changed
+            # this can only happen in case of rendered hashes
+            new_hashes.remove(new_hash)
+          else:
+            new_hash.path = h.path
+            new_hash.start_commit = current_commit
+            h.end_commit = current_commit
+            hashes_pending_update.append(h)
         else:
           # file deleted
           h.end_commit = current_commit
           hashes_pending_update.append(h)
 
 
-      #hashes_pending_update = (update_hash(h) for h in hashes_to_update)
       Hash.objects.bulk_update(hashes_pending_update, ['end_commit'], batch_size=2000)
 
     if added_files_paths:
       for path in added_files_paths:
+        # when inside a transaction, this should also be executed in batches
+        # see https://stackoverflow.com/questions/3395236/aggregating-saves-in-django
         db_path, _ = Path.objects.get_or_create(**path)
         for h in hashes_by_paths[db_path.filesystem]:
           h.path = db_path
           h.start_commit = current_commit
 
-      Hash.objects.bulk_create(new_hashes)
+    # insert all new hashes (corresponding to both new and modified files) into the database
+    Hash.objects.bulk_create(new_hashes)
 
 
 def _get_document(file_content):
