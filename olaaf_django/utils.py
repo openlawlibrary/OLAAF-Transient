@@ -6,18 +6,54 @@ hasher = hashlib.sha256
 
 
 def calc_hash(content):
+  """
+  <Purpose>
+    Calculate sha-256 hash of the provided binary string
+  <Arguments>
+    content:
+      Binary string whose hash will be calculated
+  <Returns>
+    sha-256 hash of the input
+  """
   return hasher(content).hexdigest()
 
 def calc_file_hash(file_path):
+  """
+  <Purpose>
+    Calculate sha-256 hash of a file with at the provided path
+  <Arguments>
+    file_path:
+      Path to file whose hash will be calculated
+  <Returns>
+    sha-256 hash of content of a file at the provided path
+  """
   content = open(file_path, 'rb').read()
   return calc_hash(content)
 
 def get_html_document(page_source):
+  """
+  <Purpose>
+    Create and return lxml document given its content
+  <Arguments>
+    page_source:
+      Document content
+  <Returs>
+    Created lxml document
+  """
   # unescape page source
   page_source = html.unescape(page_source)
   return et.fromstring(page_source, et.HTMLParser())
 
 def get_auth_div_content(doc):
+  """
+  <Purpose>
+    Get div which contains class tuf-authetnicate belonging to the provided document
+  <Arguments>
+    doc:
+      An lxml document
+    <Returns>
+      div lxml element with class tuf-authenticate if the document contains it, None otherwise
+  """
   auth_div = doc.xpath(".//*[contains(@class, 'tuf-authenticate')]")
   if auth_div:
     return auth_div[0]
@@ -25,9 +61,15 @@ def get_auth_div_content(doc):
 
 def strip_binary_content(content):
   """
-  git show removes an empty line at the end of files, meaning that hash inserted into the database
-  is calculated based on content which does not have that new line.
-  So, it is necessary to remove it from the provided binary content before calculating its hash.
-  surrogateescape is an error handler used to cope with encoding problems.
+  <Purpose>
+    Git show removes an empty line at the end of files, meaning that hash inserted into the database
+    is calculated based on content which does not have that new line.
+    So, it is necessary to remove it from the provided binary content before calculating its hash.
+    surrogateescape is an error handler used to cope with encoding problems.
+  <Arguments>
+    contents:
+       binary string from which leading and trailing whitespaces should be stripped
+  <Returns>
+    Stripped content
   """
   return content.decode('utf-8', 'surrogateescape').strip().encode('utf-8', 'surrogateescape')

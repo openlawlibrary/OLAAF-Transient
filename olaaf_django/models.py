@@ -44,6 +44,7 @@ class Commit(models.Model):
 class Path(models.Model):
   filesystem = models.CharField(max_length=260)
   url = models.CharField(max_length=260)
+  search_path = models.CharField(max_length=200, null=True)
   citation = models.CharField(max_length=100, null=True)
   edition = models.ForeignKey(Edition, on_delete=models.CASCADE)
 
@@ -55,10 +56,8 @@ class Path(models.Model):
     ]
 
   def __str__(self):
-    return 'filesystem path: {}, url={}, citation={}, edition={}'.format(self.filesystem,
-                                                                         self.url,
-                                                                         self.citation,
-                                                                         self.edition)
+    return 'filesystem path: {}, url={}, citation={}, edition={}, search_path={}'. \
+        format(self.filesystem, self.url, self.citation, self.edition, self.search_path)
 
 
 class Hash(models.Model):
@@ -73,7 +72,6 @@ class Hash(models.Model):
   start_commit = models.ForeignKey(Commit, on_delete=models.CASCADE, related_name='hash_start_commit')
   end_commit = models.ForeignKey(Commit, on_delete=models.SET_NULL, null=True, related_name='hash_end_commit')
   hash_type = models.CharField(max_length=1, choices=TYPE_CHOICES, default=BITSTREAM)
-  search_path = models.CharField(max_length=200)
 
   class Meta:
     unique_together = ('path', 'value', 'hash_type')
