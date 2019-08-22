@@ -149,8 +149,8 @@ def _insert_diff_hashes(edition, repo, prev_commit, current_commit):
         hashes_query = hashes_query | hash_query
 
     if action != 'D':
-      bitstream_hahs, rendered_hash = _calculate_file_hashes(file_content, doc)
-      hashes_by_paths_and_types[(posix_path, Hash.BITSTREAM)] = bitstream_hahs
+      bitstream_hash, rendered_hash = _calculate_file_hashes(file_content, doc)
+      hashes_by_paths_and_types[(posix_path, Hash.BITSTREAM)] = bitstream_hash
       if rendered_hash is not None:
         hashes_by_paths_and_types[(posix_path, Hash.RENDERED)] = rendered_hash
 
