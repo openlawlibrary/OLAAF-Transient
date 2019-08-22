@@ -1,0 +1,6 @@
+#!C:\Users\xx\Envs\transient_auth\Scripts\python.exe
+import subprocess
+import os
+path = os.path.dirname(os.path.realpath(__file__))
+
+subprocess.call(['C:\\Users\\xx\\Envs\\transient_auth\\Scripts\\python.exe', os.path.join(path,'post_merge.py')])
