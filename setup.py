@@ -6,7 +6,7 @@ AUTHOR = 'Open Law Library'
 AUTHOR_EMAIL = 'info@openlawlib.org'
 DESCRIPTION = 'Implementation of transient authentication'
 KEYWORDS = 'transient authentication'
-URL = 'https://github.com/openlawlibrary/taf/tree/master'
+URL = 'https://github.com/openlawlibrary/OLAAF-Transient/tree/master'
 
 with open('README.md', encoding='utf-8') as file_object:
   long_description = file_object.read()
@@ -43,7 +43,7 @@ setup(
     packages=packages,
     include_package_data=True,
     data_files=[
-        ('lib/site-packages/taf', [
+        ('lib/site-packages/olaaf_transient', [
             './LICENSE.txt',
             './README.md'
         ])
