@@ -1,21 +1,28 @@
+import pathlib
 import tempfile
 import uuid
-import pathlib
-from django.db.models import Q
-from django.db import transaction
-from git import Repo
 from datetime import datetime
-from selenium import webdriver
 from urllib.parse import urlparse
-from selenium.webdriver.chrome.options import Options
+
+from django.db import transaction
+from django.db.models import Q
+from git import Repo
 from lxml import etree as et
-from olaaf_django.models import Commit, Path, Hash, Edition, Repository
-from olaaf_django.utils import calc_hash, get_auth_div_content, get_html_document
+from selenium import webdriver
+from selenium.webdriver.chrome.options import Options
+
+from olaaf_django.models import Commit, Edition, Hash, Path, Repository
+from olaaf_django.utils import (calc_hash, get_auth_div_content,
+                                get_html_document)
 
 chrome_options = Options()
 chrome_options.add_argument("--headless")
 chrome_options.add_argument('--no-sandbox')
 driver = webdriver.Chrome(chrome_options=chrome_options)
+
+options = webdriver.ChromeOptions()
+options.add_argument("headless")
+driver = webdriver.Chrome(chrome_options=options)
 
 EMPTY_TREE_SHA = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 # currently supported file types
@@ -36,29 +43,28 @@ def sync_hashes(repo_path):
   repo_path = pathlib.Path(repo_path)
   repo_name = '{}/{}'.format(repo_path.parent.name, repo_path.name)
   repo = Repo(str(repo_path))
-  repo_commits = list(repo.iter_commits('master'))[::-1]
 
-  # TODO we need to know when an edition ends and where it begins
-  # since editions are on branches, maybe use them
-  # or call this edition by edition
+  repository, _ = Repository.objects.get_or_create(name=repo_name)
 
-  repository, created = Repository.objects.get_or_create(name=repo_name)
-  edition = None
-  if not created:
-    edition = Edition.objects.filter(repository=repository).latest('id')
+  # Call sync hashes for all release branches
+  for release_branch in filter(lambda b: b.name.startswith('release/'), repo.branches):
+    release_commits = list(repo.iter_commits(release_branch, reverse=True))
 
-  if edition is None:
-    # create the initial edition
-    commit_date = repo.git.show(s=True, format='%ci {}'.format(repo_commits[0].hexsha)).split()[0]
-    edition_name = commit_date.rsplit('-', 1)[0]
-    edition = Edition(name=edition_name, date=commit_date, repository=repository)
-    edition.save()
+    commit_date = repo.git.show(s=True, format=f'%ci {release_commits[0].hexsha}').split()[0]
+    release, _ = Edition.objects.get_or_create(repository=repository,
+                                               name=release_branch.name.strip('release/'),
+                                               date=commit_date)
+    # LATEST EDITION
+    # Edition.objects.order_by('-name')[0]
+    _sync_hashes_for_edition(repo, release, release_commits)
 
+
+def _sync_hashes_for_edition(repo, edition, edition_commits):
   # check if commits are already in the database
   # if they are, see if there are commits which have not been inserted yet
   # if not, insert the hashes from the beginning
   inserted_commits = Commit.objects.filter(edition=edition)[::1]
-  if len(inserted_commits) == len(repo_commits):
+  if len(inserted_commits) == len(edition_commits):
     print('All commits have been loaded into the database')
     return
 
@@ -69,7 +75,7 @@ def sync_hashes(repo_path):
   else:
     prev_commit = inserted_commits[-1]
 
-  for commit in repo_commits[inserted_commits_num::]:
+  for commit in edition_commits[inserted_commits_num::]:
     # TODO
     # We should not use commit date here since it has not been authenticated
     # The date could be a part of the information passed to sync_hashes, see issue #2
@@ -127,7 +133,7 @@ def _insert_diff_hashes(edition, repo, prev_commit, current_commit):
     # M/A/D file_path
     action, file_path = changed_file.split(maxsplit=1)
     file_path = pathlib.Path(file_path)
-    file_type = file_path.suffix.strip('.')
+    file_type = file_path. suffix.strip('.')
     if file_type not in SUPPORTED_TYPES:
       continue
 
@@ -149,7 +155,11 @@ def _insert_diff_hashes(edition, repo, prev_commit, current_commit):
       # to store doc object to be used later. It is probably far more likely that the path
       # will have to be created than not
       url = _get_url(posix_path, file_type, doc)
-      search_path = doc.xpath('.//@data-search-path')[-1] if doc is not None else None
+      try:
+        search_path = doc.xpath('.//@data-search-path')[-1] if doc is not None else None
+      except IndexError:
+        search_path = None
+
       added_files_paths.append({'filesystem': posix_path, 'url': url, 'edition': edition,
                                 'search_path': search_path})
     else:
@@ -169,10 +179,13 @@ def _insert_diff_hashes(edition, repo, prev_commit, current_commit):
         current_query_length += 1
 
     if action != 'D':
-      bitstream_hash, rendered_hash = _calculate_file_hashes(file_content, doc)
-      hashes_by_paths_and_types[(posix_path, Hash.BITSTREAM)] = bitstream_hash
+      bitstream_hash, rendered_hash = _calculate_file_hashes(
+          file_content, doc)
+      hashes_by_paths_and_types[(
+          posix_path, Hash.BITSTREAM)] = bitstream_hash
       if rendered_hash is not None:
-        hashes_by_paths_and_types[(posix_path, Hash.RENDERED)] = rendered_hash
+        hashes_by_paths_and_types[(
+            posix_path, Hash.RENDERED)] = rendered_hash
 
   if current_query is not None:
     hashes_queries.append(current_query)
@@ -181,7 +194,7 @@ def _insert_diff_hashes(edition, repo, prev_commit, current_commit):
                                    added_files_paths)
 
 
-@transaction.atomic
+# @transaction.atomic
 def _add_and_update_paths_and_hashes(current_commit, hashes_queries, hashes_by_paths_and_types,
                                      added_files_paths):
   """
@@ -193,7 +206,7 @@ def _add_and_update_paths_and_hashes(current_commit, hashes_queries, hashes_by_p
       Current repo commit. Added hashes will have that commit as their start commit. In case
       of modification and removal of files, this commit will be set as the end commit of the
       appropriate hashes.
-    hashes_query:
+    hashes_queries:
       Django's Q object which combines query statements each of which retrieves one hash
       from the database.
     hashes_by_paths_and_types:
@@ -239,7 +252,8 @@ def _add_and_update_paths_and_hashes(current_commit, hashes_queries, hashes_by_p
       # see https://stackoverflow.com/questions/3395236/aggregating-saves-in-django
       db_path, _ = Path.objects.get_or_create(**path)
       for hash_type in (Hash.RENDERED, Hash.BITSTREAM):
-        h = hashes_by_paths_and_types.get((db_path.filesystem, hash_type))
+        h = hashes_by_paths_and_types.get(
+            (db_path.filesystem, hash_type))
         if h is not None:
           h.path = db_path
           h.start_commit = current_commit
@@ -270,7 +284,8 @@ def _calculate_file_hashes(file_content, doc):
     auth_div = get_auth_div_content(doc)
     if auth_div is not None:
       rendered_hash_value = calc_hash(et.tostring(auth_div))
-      rendered_hash = Hash(value=rendered_hash_value, hash_type=Hash.RENDERED)
+      rendered_hash = Hash(value=rendered_hash_value,
+                           hash_type=Hash.RENDERED)
 
   return bitstream_hash, rendered_hash
 
@@ -370,7 +385,7 @@ def _get_url(path, file_type, doc):
 
   # try to get url based on content of the url property
   meta_url = doc.xpath(".//*[contains(@property, 'og:url')]")
-  if meta_url is not None:
+  if meta_url is not None and len(meta_url):
     url = meta_url[0].get('content')
     url = urlparse(url).path
   else:
