@@ -2,8 +2,16 @@ from django.core.validators import MinLengthValidator
 from django.db import models
 
 
+class LowerCharField(models.CharField):
+  def __init__(self, *args, **kwargs):
+    super().__init__(*args, **kwargs)
+
+  def get_prep_value(self, value):
+    return str(value).lower()
+
+
 class Repository(models.Model):
-  name = models.CharField(max_length=60)
+  name = LowerCharField(max_length=60)
 
   class Meta:
     verbose_name = "Repository"
@@ -48,9 +56,9 @@ class Commit(models.Model):
 
 class Path(models.Model):
   filesystem = models.CharField(max_length=260)
-  url = models.CharField(max_length=260)
-  search_path = models.CharField(max_length=200, null=True)
-  citation = models.CharField(max_length=100, null=True)
+  url = LowerCharField(max_length=260)
+  search_path = LowerCharField(max_length=200, null=True)
+  citation = LowerCharField(max_length=100, null=True)
   publication = models.ForeignKey(Publication, on_delete=models.CASCADE)
 
   class Meta:
