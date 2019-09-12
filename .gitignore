@@ -91,3 +91,6 @@ db.sqlite3
 # TAF
 taf.log
 taf.err
+
+# pytest
+.pytest_cache/
