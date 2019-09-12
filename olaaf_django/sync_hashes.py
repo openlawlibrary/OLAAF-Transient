@@ -11,7 +11,7 @@ from lxml import etree as et
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 
-from olaaf_django.models import Commit, Edition, Hash, Path, Repository
+from olaaf_django.models import Commit, Hash, Path, Publication, Repository
 from olaaf_django.utils import (calc_hash, get_auth_div_content,
                                 get_html_document)
 
@@ -32,12 +32,12 @@ MAX_QUERIES = 500
 
 def sync_hashes(repo_path):
   """
-  Given a path of an html repository, traverse through all commits which
-  have not yet been inserted into the database and insert them. For each commit,
-  calculate hashes of all new/modified files and calculates hashes of added files.
-  Update previously calculated hashes of modified and deleted files and set their
-  valid until date.
-  Editions are not supported at the moment.
+  Given a path of an html repository, gets the publication branches and
+  traverse through all its commits which have not yet been inserted into the
+  database and insert them. For each commit, calculate hashes of all
+  new/modified files and calculates hashes of added files. Update previously
+  calculated hashes of modified and deleted files and set their valid until
+  date.
   """
 
   repo_path = pathlib.Path(repo_path)
@@ -46,25 +46,24 @@ def sync_hashes(repo_path):
 
   repository, _ = Repository.objects.get_or_create(name=repo_name)
 
-  # Call sync hashes for all release branches
-  for release_branch in filter(lambda b: b.name.startswith('release/'), repo.branches):
-    release_commits = list(repo.iter_commits(release_branch, reverse=True))
+  # Call sync hashes for all publications
+  for pub_branch in filter(lambda b: b.name.startswith('publication/'), repo.branches):
+    publication_commits = list(repo.iter_commits(pub_branch, reverse=True))
 
-    commit_date = repo.git.show(s=True, format=f'%ci {release_commits[0].hexsha}').split()[0]
-    release, _ = Edition.objects.get_or_create(repository=repository,
-                                               name=release_branch.name.strip('release/'),
-                                               date=commit_date)
-    # LATEST EDITION
-    # Edition.objects.order_by('-name')[0]
-    _sync_hashes_for_edition(repo, release, release_commits)
+    commit_date = repo.git.show(s=True, format=f'%ci {publication_commits[0].hexsha}').split()[0]
+    release, _ = Publication.objects.get_or_create(repository=repository,
+                                                   name=pub_branch.name.strip(
+                                                       'publication/'),
+                                                   date=commit_date)
+    _sync_hashes_for_publication(repo, release, publication_commits)
 
 
-def _sync_hashes_for_edition(repo, edition, edition_commits):
+def _sync_hashes_for_publication(repo, publication, publication_commits):
   # check if commits are already in the database
   # if they are, see if there are commits which have not been inserted yet
   # if not, insert the hashes from the beginning
-  inserted_commits = Commit.objects.filter(edition=edition)[::1]
-  if len(inserted_commits) == len(edition_commits):
+  inserted_commits = Commit.objects.filter(publication=publication)[::1]
+  if len(inserted_commits) == len(publication_commits):
     print('All commits have been loaded into the database')
     return
 
@@ -75,7 +74,7 @@ def _sync_hashes_for_edition(repo, edition, edition_commits):
   else:
     prev_commit = inserted_commits[-1]
 
-  for commit in edition_commits[inserted_commits_num::]:
+  for commit in publication_commits[inserted_commits_num::]:
     # TODO
     # We should not use commit date here since it has not been authenticated
     # The date could be a part of the information passed to sync_hashes, see issue #2
@@ -83,20 +82,20 @@ def _sync_hashes_for_edition(repo, edition, edition_commits):
     # already exists. We have not yet implemented anything that would be affected by the
     # missing counter
     date = datetime.utcfromtimestamp(commit.committed_date).date()
-    current_commit = Commit(edition=edition, sha=commit.hexsha, date=date)
-    _insert_diff_hashes(edition, repo, prev_commit, current_commit)
+    current_commit = Commit(publication=publication, sha=commit.hexsha, date=date)
+    _insert_diff_hashes(publication, repo, prev_commit, current_commit)
     prev_commit = current_commit
 
 
-def _insert_diff_hashes(edition, repo, prev_commit, current_commit):
+def _insert_diff_hashes(publication, repo, prev_commit, current_commit):
   """
   <Purpose>
     Inserts and updates hashes for each document that was added, modified
     or deleted in the specified commit `current_commit`. Uses git diff
     to find the difference between previous commit `prev_commit` and `current_commit`.
   <Arguments>
-    edition:
-      Edition to which the inserted hashes belong
+    publication:
+      Publication to which the inserted hashes belong
     repo:
       Git repository whose commits and hashes and being inserted into the database
     prev_commit:
@@ -160,7 +159,7 @@ def _insert_diff_hashes(edition, repo, prev_commit, current_commit):
       except IndexError:
         search_path = None
 
-      added_files_paths.append({'filesystem': posix_path, 'url': url, 'edition': edition,
+      added_files_paths.append({'filesystem': posix_path, 'url': url, 'publication': publication,
                                 'search_path': search_path})
     else:
       # If the file was modified or deleted, it is necessary to update its latest hash
