@@ -19,6 +19,7 @@ driver = webdriver.Chrome(chrome_options=options)
 EMPTY_TREE_SHA = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 # currently supported file types
 SUPPORTED_TYPES = ['html', 'pdf']
+MAX_QUERIES = 500
 
 
 def sync_hashes(repo_path):
@@ -105,7 +106,12 @@ def _insert_diff_hashes(edition, repo, prev_commit, current_commit):
   # these path have to be inserted into the database
   added_files_paths = []
   # query hashes which were updated or deleted
-  hashes_query = None
+  # in case of some databases (e.g. sqlite which is used for testing) iterator raises an
+  # exception if there are over 1000 results
+  # so, we need to separate one big query into multiple smaller one
+  hashes_queries = []
+  current_query = None
+  current_query_length = 0
   doc = None
   # a dictionary which maps path, type tuples to hashes
   hashes_by_paths_and_types = {}
@@ -123,6 +129,11 @@ def _insert_diff_hashes(edition, repo, prev_commit, current_commit):
     file_type = file_path.suffix.strip('.')
     if file_type not in SUPPORTED_TYPES:
       continue
+
+    path_parts = file_path.parts[:-1]
+    if any((path_part[0] in ('_', '.') for path_part in path_parts)):
+      continue
+
     posix_path = file_path.as_posix()
 
     # Unless the file was deleted, we need to read its content in order to calculate
@@ -143,10 +154,18 @@ def _insert_diff_hashes(edition, repo, prev_commit, current_commit):
     else:
       # If the file was modified or deleted, it is necessary to update its latest hash
       hash_query = Q(path__filesystem=posix_path, end_commit__isnull=True)
-      if hashes_query is None:
-        hashes_query = hash_query
+      if not current_query_length:
+        current_query = hash_query
+        current_query_length = 1
       else:
-        hashes_query = hashes_query | hash_query
+        current_query = current_query | hash_query
+
+      if current_query_length == MAX_QUERIES:
+        hashes_queries.append(current_query)
+        current_query = None
+        current_query_length = 0
+      else:
+        current_query_length += 1
 
     if action != 'D':
       bitstream_hash, rendered_hash = _calculate_file_hashes(file_content, doc)
@@ -154,12 +173,15 @@ def _insert_diff_hashes(edition, repo, prev_commit, current_commit):
       if rendered_hash is not None:
         hashes_by_paths_and_types[(posix_path, Hash.RENDERED)] = rendered_hash
 
-  _add_and_update_paths_and_hashes(current_commit, hashes_query, hashes_by_paths_and_types,
+  if current_query is not None:
+    hashes_queries.append(current_query)
+
+  _add_and_update_paths_and_hashes(current_commit, hashes_queries, hashes_by_paths_and_types,
                                    added_files_paths)
 
 
 @transaction.atomic
-def _add_and_update_paths_and_hashes(current_commit, hashes_query, hashes_by_paths_and_types,
+def _add_and_update_paths_and_hashes(current_commit, hashes_queries, hashes_by_paths_and_types,
                                      added_files_paths):
   """
   <Purpose>
@@ -183,29 +205,30 @@ def _add_and_update_paths_and_hashes(current_commit, hashes_query, hashes_by_pat
   """
   current_commit.save()
 
-  if hashes_query is not None:
+  if len(hashes_queries):
     # find all hashes which were modified or deleted
 
     def _get_hashes_pending_update():
-      hashes_to_update = Hash.objects.filter(hashes_query).iterator()  # default batch size 2000
-      for h in hashes_to_update:
-        path_and_hash = (h.path.filesystem, h.hash_type)
-        new_hash = hashes_by_paths_and_types.get(path_and_hash)
-        if new_hash is not None:
-          # hash was modified
-          if new_hash.value == h.value:
-            # do not update the existing hash and insert a new one if it remained unchanged
-            # this can only happen in case of rendered hashes
-            del hashes_by_paths_and_types[path_and_hash]
+      for hashes_query in hashes_queries:
+        hashes_to_update = Hash.objects.filter(hashes_query).iterator()
+        for h in hashes_to_update:
+          path_and_hash = (h.path.filesystem, h.hash_type)
+          new_hash = hashes_by_paths_and_types.get(path_and_hash)
+          if new_hash is not None:
+            # hash was modified
+            if new_hash.value == h.value:
+              # do not update the existing hash and insert a new one if it remained unchanged
+              # this can only happen in case of rendered hashes
+              del hashes_by_paths_and_types[path_and_hash]
+            else:
+              new_hash.path = h.path
+              new_hash.start_commit = current_commit
+              h.end_commit = current_commit
+              yield h
           else:
-            new_hash.path = h.path
-            new_hash.start_commit = current_commit
+            # file deleted
             h.end_commit = current_commit
             yield h
-        else:
-          # file deleted
-          h.end_commit = current_commit
-          yield h
 
     Hash.objects.bulk_update(_get_hashes_pending_update(), ['end_commit'], batch_size=2000)
 
