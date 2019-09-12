@@ -1,0 +1,19 @@
+recursive-exclude __pycache__  *.pyc *.pyo *.orig
+
+exclude *.git*
+exclude *.coveragerc
+exclude *.sh
+exclude proc*
+exclude pylint*
+
+include requirements.txt
+exclude requirements-dev.*
+include *.py
+
+prune .git
+prune env
+prune tests*
+
+recursive-include olaaf_django/templates *
+recursive-exclude docs *
+recursive-exclude tests *
