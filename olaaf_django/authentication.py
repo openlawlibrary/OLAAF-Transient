@@ -1,11 +1,14 @@
 import mimetypes
-from lxml import etree as et
-from .models import Hash, Commit
-from .utils import calc_hash, strip_binary_content, get_html_document, \
-  get_auth_div_content
 
-# TODO we need to store the information about which edition the document
-# belongs to (and to which repository that edition belongs to)
+from lxml import etree as et
+
+from .models import Commit, Hash
+from .utils import (calc_hash, get_auth_div_content, get_html_document,
+                    strip_binary_content)
+
+# TODO we need to store the information about which publication the document
+# belongs to (and to which repository that publication belongs to)
+
 
 def check_authenticity(url, content):
   if not url.startswith('/'):
@@ -13,8 +16,8 @@ def check_authenticity(url, content):
   content_type, _ = mimetypes.guess_type(url)
   file_type = content_type.split('/')[1] if content_type is not None else 'html'
   hashing_func = {
-    'html': _calculate_html_hash,
-    'pdf': _calculate_binary_content_hash
+      'html': _calculate_html_hash,
+      'pdf': _calculate_binary_content_hash
   }.get(file_type)
 
   if hashing_func is None:
@@ -35,14 +38,17 @@ def check_authenticity(url, content):
     # not authentic
     return AuthetnicationResponse(url)
 
+
 def _calculate_binary_content_hash(binary_content):
   binary_content = strip_binary_content(binary_content)
   return calc_hash(binary_content)
+
 
 def _calculate_html_hash(html_content):
   doc = get_html_document(html_content)
   body_section = get_auth_div_content(doc)
   return calc_hash(et.tostring(body_section))
+
 
 class AuthetnicationResponse():
 
