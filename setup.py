@@ -50,10 +50,10 @@ setup(
     ],
     zip_safe=False,
     install_requires=[
-        'Django >= 2.2.3',
+        'Django >= 2.0',
         'GitPython >= 2.1.11',
         'selenium >= 3.141.0',
-        'lxml >= 4.3.4',
+        'lxml >= 4.3',
     ],
     extras_require={
         'ci': ci_require,
