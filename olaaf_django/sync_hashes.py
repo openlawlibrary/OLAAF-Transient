@@ -20,10 +20,6 @@ chrome_options.add_argument("--headless")
 chrome_options.add_argument('--no-sandbox')
 driver = webdriver.Chrome(chrome_options=chrome_options)
 
-options = webdriver.ChromeOptions()
-options.add_argument("headless")
-driver = webdriver.Chrome(chrome_options=options)
-
 EMPTY_TREE_SHA = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 # currently supported file types
 SUPPORTED_TYPES = ['html', 'pdf']
@@ -158,6 +154,9 @@ def _insert_diff_hashes(publication, repo, prev_commit, current_commit):
       try:
         search_path = doc.xpath('.//@data-search-path')[-1] if doc is not None else None
       except IndexError:
+        doc_tile = doc.xpath('//title/text()')
+        print(f'Document with title {doc_title} does not contain data-search-path!\n')
+
         search_path = None
 
       added_files_paths.append({'filesystem': posix_path, 'url': url, 'publication': publication,
@@ -181,11 +180,9 @@ def _insert_diff_hashes(publication, repo, prev_commit, current_commit):
     if action != 'D':
       bitstream_hash, rendered_hash = _calculate_file_hashes(
           file_content, doc)
-      hashes_by_paths_and_types[(
-          posix_path, Hash.BITSTREAM)] = bitstream_hash
+      hashes_by_paths_and_types[(posix_path, Hash.BITSTREAM)] = bitstream_hash
       if rendered_hash is not None:
-        hashes_by_paths_and_types[(
-            posix_path, Hash.RENDERED)] = rendered_hash
+        hashes_by_paths_and_types[(posix_path, Hash.RENDERED)] = rendered_hash
 
   if current_query is not None:
     hashes_queries.append(current_query)
