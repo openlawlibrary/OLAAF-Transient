@@ -1,6 +1,8 @@
+import datetime as dt
 import hashlib
-from lxml import etree as et
 import html
+
+from lxml import etree as et
 
 hasher = hashlib.sha256
 
@@ -17,6 +19,7 @@ def calc_hash(content):
   """
   return hasher(content).hexdigest()
 
+
 def calc_file_hash(file_path):
   """
   <Purpose>
@@ -29,6 +32,7 @@ def calc_file_hash(file_path):
   """
   content = open(file_path, 'rb').read()
   return calc_hash(content)
+
 
 def get_html_document(page_source):
   """
@@ -43,6 +47,7 @@ def get_html_document(page_source):
   # unescape page source
   page_source = html.unescape(page_source)
   return et.fromstring(page_source, et.HTMLParser())
+
 
 def get_auth_div_content(doc):
   """
@@ -59,6 +64,7 @@ def get_auth_div_content(doc):
     return auth_div[0]
   return None
 
+
 def strip_binary_content(content):
   """
   <Purpose>
@@ -73,3 +79,13 @@ def strip_binary_content(content):
     Stripped content
   """
   return content.decode('utf-8', 'surrogateescape').strip().encode('utf-8', 'surrogateescape')
+
+
+def is_iso_date(date):
+  """Check if input date is a valid iso date.
+  """
+  try:
+    dt.datetime.strptime(date, '%Y-%m-%d').date().isoformat()
+    return True
+  except ValueError:
+    return False

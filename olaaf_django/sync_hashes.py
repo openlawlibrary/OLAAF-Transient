@@ -13,7 +13,7 @@ from selenium.webdriver.chrome.options import Options
 
 from olaaf_django.models import Commit, Hash, Path, Publication, Repository
 from olaaf_django.utils import (calc_hash, get_auth_div_content,
-                                get_html_document)
+                                get_html_document, is_iso_date)
 
 chrome_options = Options()
 chrome_options.add_argument("--headless")
@@ -80,7 +80,9 @@ def _sync_hashes_for_publication(repo, publication, publication_commits):
     # Since this is going to be changed soon, not making an effort to check if that date
     # already exists. We have not yet implemented anything that would be affected by the
     # missing counter
-    date = datetime.utcfromtimestamp(commit.committed_date).date()
+    commit_msg = commit.message.strip()
+    date = commit_msg if is_iso_date(commit_msg) \
+        else datetime.utcfromtimestamp(commit.committed_date).date()
     current_commit = Commit(publication=publication, sha=commit.hexsha, date=date)
     _insert_diff_hashes(publication, repo, prev_commit, current_commit)
     prev_commit = current_commit
