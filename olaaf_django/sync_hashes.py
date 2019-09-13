@@ -7,14 +7,15 @@ from git import Repo
 from datetime import datetime
 from selenium import webdriver
 from urllib.parse import urlparse
+from selenium.webdriver.chrome.options import Options
 from lxml import etree as et
 from olaaf_django.models import Commit, Path, Hash, Edition, Repository
 from olaaf_django.utils import calc_hash, get_auth_div_content, get_html_document
 
-
-options = webdriver.ChromeOptions()
-options.add_argument("headless")
-driver = webdriver.Chrome(chrome_options=options)
+chrome_options = Options()
+chrome_options.add_argument("--headless")
+chrome_options.add_argument('--no-sandbox')
+driver = webdriver.Chrome(chrome_options=chrome_options)
 
 EMPTY_TREE_SHA = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 # currently supported file types
