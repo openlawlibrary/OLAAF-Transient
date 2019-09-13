@@ -52,8 +52,7 @@ def sync_hashes(repo_path):
 
     commit_date = repo.git.show(s=True, format=f'%ci {publication_commits[0].hexsha}').split()[0]
     release, _ = Publication.objects.get_or_create(repository=repository,
-                                                   name=pub_branch.name.strip(
-                                                       'publication/'),
+                                                   name=pub_branch.name.strip('publication/'),
                                                    date=commit_date)
     _sync_hashes_for_publication(repo, release, publication_commits)
 
@@ -132,7 +131,7 @@ def _insert_diff_hashes(publication, repo, prev_commit, current_commit):
     # M/A/D file_path
     action, file_path = changed_file.split(maxsplit=1)
     file_path = pathlib.Path(file_path)
-    file_type = file_path. suffix.strip('.')
+    file_type = file_path.suffix.strip('.')
     if file_type not in SUPPORTED_TYPES:
       continue
 
@@ -193,7 +192,7 @@ def _insert_diff_hashes(publication, repo, prev_commit, current_commit):
                                    added_files_paths)
 
 
-# @transaction.atomic
+@transaction.atomic
 def _add_and_update_paths_and_hashes(current_commit, hashes_queries, hashes_by_paths_and_types,
                                      added_files_paths):
   """
@@ -251,8 +250,7 @@ def _add_and_update_paths_and_hashes(current_commit, hashes_queries, hashes_by_p
       # see https://stackoverflow.com/questions/3395236/aggregating-saves-in-django
       db_path, _ = Path.objects.get_or_create(**path)
       for hash_type in (Hash.RENDERED, Hash.BITSTREAM):
-        h = hashes_by_paths_and_types.get(
-            (db_path.filesystem, hash_type))
+        h = hashes_by_paths_and_types.get((db_path.filesystem, hash_type))
         if h is not None:
           h.path = db_path
           h.start_commit = current_commit
@@ -283,8 +281,7 @@ def _calculate_file_hashes(file_content, doc):
     auth_div = get_auth_div_content(doc)
     if auth_div is not None:
       rendered_hash_value = calc_hash(et.tostring(auth_div))
-      rendered_hash = Hash(value=rendered_hash_value,
-                           hash_type=Hash.RENDERED)
+      rendered_hash = Hash(value=rendered_hash_value, hash_type=Hash.RENDERED)
 
   return bitstream_hash, rendered_hash
 
