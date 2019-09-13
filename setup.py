@@ -50,7 +50,7 @@ setup(
     ],
     zip_safe=False,
     install_requires=[
-        'Django >= 2.0',
+        'Django >= 2.2',
         'GitPython >= 2.1.11',
         'selenium >= 3.141.0',
         'lxml >= 4.3',
