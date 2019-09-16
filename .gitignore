@@ -94,3 +94,6 @@ taf.err
 
 # pytest
 .pytest_cache/
+
+# VS Code
+.vscode
