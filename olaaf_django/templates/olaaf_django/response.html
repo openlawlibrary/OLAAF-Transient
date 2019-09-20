@@ -1,10 +1,18 @@
 {% if not auth_response.authenticable %}
 Cannot authenticate
 {% else %}
-  {% if auth_response.authentic %}
+  {% if auth_response.date is not None %}
+    {% if auth_response.authentic %}
+Authentic on {{ auth_response.date }}
+    {% else %}
+Not authentic on {{ auth_response.date }}
+    {% endif %}
+  {% else %}
+    {% if auth_response.authentic %}
 Authentic{% if auth_response.current %} and {% else %}, but not {% endif %}current.
 Valid from {{ auth_response.from_date }}{% if not auth_response.current %} to {{ auth_response.to_date}}{% endif %}.
-  {% else %}
+    {% else %}
 Not authentic
+    {% endif %}
   {% endif %}
 {% endif %}
