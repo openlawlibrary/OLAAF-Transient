@@ -89,3 +89,12 @@ def is_iso_date(date):
     return True
   except ValueError:
     return False
+
+
+URL_PREFIX = lambda date, doc=None: f'/_date/{date}' if doc is None else f'/_date/{date}/_doc/{doc}'  # noqa
+
+def reset_local_urls(html_doc_str, date, doc=None):
+  """
+  Remove `/_api/_date/<date>/_doc/<doc>` from all absolute local urls in the html document.
+  """
+  return html_doc_str.replace(URL_PREFIX(date, doc), '')
