@@ -77,8 +77,8 @@ def _sync_hashes_for_publication(repo, publication, publication_commits):
     # already exists. We have not yet implemented anything that would be affected by the
     # missing counter
     commit_msg = commit.message.strip()
-    date = commit_msg if is_iso_date(commit_msg) \
-        else datetime.utcfromtimestamp(commit.committed_date).date()
+    publication_date, commit_date = commit_msg.split('/')
+    date = commit_date if is_iso_date(commit_date) else None
     current_commit = Commit(publication=publication, sha=commit.hexsha, date=date)
     _insert_diff_hashes(publication, repo, prev_commit, current_commit)
     prev_commit = current_commit
@@ -127,6 +127,8 @@ def _insert_diff_hashes(publication, repo, prev_commit, current_commit):
   for changed_file in diff_names:
     # git diff contains list of entries in the form of
     # M/A/D file_path
+    if not changed_file:
+      continue
     action, file_path = changed_file.split(maxsplit=1)
     file_path = pathlib.Path(file_path)
     file_type = file_path.suffix.strip('.')
