@@ -92,7 +92,7 @@ class Hash(models.Model):
     verbose_name = "Hash"
     verbose_name_plural = "Hashes"
 
-    unique_together = ('path', 'value', 'hash_type')
+    unique_together = ('path', 'value', 'hash_type', 'start_commit')
     indexes = [
         models.Index(fields=['path', 'value', 'hash_type'])
     ]
