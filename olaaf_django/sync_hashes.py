@@ -90,6 +90,8 @@ def _sync_hashes_for_publication(repo, publication, publication_commits):
     else:
       commit_date = split_commit_msg[1]
     date = commit_date if is_iso_date(commit_date) else None
+    if date is None:
+      continue
     current_commit = Commit(publication=publication, sha=commit.hexsha, date=date)
     _insert_diff_hashes(publication, repo, prev_commit, current_commit)
     prev_commit = current_commit
