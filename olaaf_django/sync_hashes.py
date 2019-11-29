@@ -47,13 +47,12 @@ def sync_hashes(repo_path):
   # Call sync hashes for all publications
   for pub_branch in _find_all_publication_branches(repo):
     publication_commits = list(repo.iter_commits(pub_branch, reverse=True))
-
-    commit_date = repo.git.show(s=True, format=f'%ci {publication_commits[0].hexsha}').split()[0]
+    commit_date = publication_commits[0].committed_datetime.date()
     publication_name = pub_branch.rsplit('/', 1)[1]
-    release, _ = Publication.objects.get_or_create(repository=repository,
-                                                   name=publication_name,
-                                                   date=commit_date)
-    _sync_hashes_for_publication(repo, release, publication_commits)
+    publication, _ = Publication.objects.get_or_create(repository=repository,
+                                                       name=publication_name,
+                                                       date=commit_date)
+    _sync_hashes_for_publication(repo, publication, publication_commits)
 
 
 def _sync_hashes_for_publication(repo, publication, publication_commits):
