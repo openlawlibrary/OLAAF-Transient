@@ -1,8 +1,10 @@
 import pathlib
 import tempfile
 import uuid
+import re
 from datetime import datetime
 from urllib.parse import urlparse
+
 
 from django.db import transaction
 from django.db.models import Q
@@ -43,20 +45,21 @@ def sync_hashes(repo_path):
   repository, _ = Repository.objects.get_or_create(name=repo_name)
 
   # Call sync hashes for all publications
-  for pub_branch in filter(lambda b: b.name.startswith('publication/'), repo.branches):
+  for pub_branch in _find_all_publication_branches(repo):
     publication_commits = list(repo.iter_commits(pub_branch, reverse=True))
-
-    commit_date = repo.git.show(s=True, format=f'%ci {publication_commits[0].hexsha}').split()[0]
-    release, _ = Publication.objects.get_or_create(repository=repository,
-                                                   name=pub_branch.name.strip('publication/'),
-                                                   date=commit_date)
-    _sync_hashes_for_publication(repo, release, publication_commits)
+    commit_date = publication_commits[0].committed_datetime.date()
+    publication_name = pub_branch.rsplit('/', 1)[1]
+    publication, _ = Publication.objects.get_or_create(repository=repository,
+                                                       name=publication_name,
+                                                       date=commit_date)
+    _sync_hashes_for_publication(repo, publication, publication_commits)
 
 
 def _sync_hashes_for_publication(repo, publication, publication_commits):
   # check if commits are already in the database
   # if they are, see if there are commits which have not been inserted yet
   # if not, insert the hashes from the beginning
+  print(f'Syncing hashes of publication {publication.name}')
   inserted_commits = Commit.objects.filter(publication=publication)[::1]
   if len(inserted_commits) == len(publication_commits):
     print('All commits have been loaded into the database')
@@ -68,8 +71,7 @@ def _sync_hashes_for_publication(repo, publication, publication_commits):
     prev_commit = Commit(sha=EMPTY_TREE_SHA)
   else:
     prev_commit = inserted_commits[-1]
-
-  for commit in publication_commits[inserted_commits_num::]:
+  for commit in publication_commits[inserted_commits_num + 1::]:
     # TODO
     # We should not use commit date here since it has not been authenticated
     # The date could be a part of the information passed to sync_hashes, see issue #2
@@ -77,11 +79,56 @@ def _sync_hashes_for_publication(repo, publication, publication_commits):
     # already exists. We have not yet implemented anything that would be affected by the
     # missing counter
     commit_msg = commit.message.strip()
-    publication_date, commit_date = commit_msg.split('/')
+    # skip emtpy publication initialization commit
+    # this will be after above mentioned refactoring
+    if commit_msg.startswith('publication'):
+      continue
+    split_commit_msg = commit_msg.split('/')
+    if len(split_commit_msg) == 1:
+      commit_date = commit_msg
+    else:
+      commit_date = split_commit_msg[1]
     date = commit_date if is_iso_date(commit_date) else None
+    if date is None:
+      continue
     current_commit = Commit(publication=publication, sha=commit.hexsha, date=date)
     _insert_diff_hashes(publication, repo, prev_commit, current_commit)
     prev_commit = current_commit
+
+
+def _find_all_publication_branches(repo):
+  remote_branches = repo.git.branch('-r')
+  if remote_branches:
+    remote_branches = [branch.strip() for branch in remote_branches.split('\n') if 'HEAD' not in branch]
+  local_branches = repo.branches
+  pub_branches = []
+  for branch in local_branches:
+    branch_name = branch.name
+    if (_check_if_valid_publication_branch_name(branch_name)):
+      pub_branches.append(branch_name)
+  for branch_name in remote_branches:
+    branch_local_name = branch_name.split('/', 1)[1]
+    if branch_local_name in pub_branches:
+      continue
+    if (_check_if_valid_publication_branch_name(branch_local_name)):
+      pub_branches.append(branch_name)
+  return pub_branches
+
+
+PUBLICATION_BRANCH_NAME = r'^publication\/(?P<pub_date>\d{4}-\d{2})(-\d{2})?$'
+PUBLICATION_BRANCH_NAME_RE = re.compile(PUBLICATION_BRANCH_NAME)
+
+
+def _check_if_valid_publication_branch_name(branch_name):
+    match = PUBLICATION_BRANCH_NAME_RE.match(branch_name)
+    if not match:
+      return False
+    try:
+      datetime.strptime(match.group('pub_date'), '%Y-%m')
+    except ValueError:
+      return False
+    return True
+
 
 
 def _insert_diff_hashes(publication, repo, prev_commit, current_commit):
@@ -119,7 +166,6 @@ def _insert_diff_hashes(publication, repo, prev_commit, current_commit):
   # a dictionary which maps path, type tuples to hashes
   hashes_by_paths_and_types = {}
   # keep track of new hashes which should be inserted into the database
-  new_hashes = []
 
   diff = repo.git.diff('--name-status', prev_commit.sha, current_commit.sha)
   diff_names = diff.split('\n')
@@ -156,7 +202,7 @@ def _insert_diff_hashes(publication, repo, prev_commit, current_commit):
       try:
         search_path = doc.xpath('.//@data-search-path')[-1] if doc is not None else None
       except IndexError:
-        doc_tile = doc.xpath('//title/text()')
+        doc_title = doc.xpath('//title/text()')
         print(f'Document with title {doc_title} does not contain data-search-path!\n')
 
         search_path = None
@@ -216,6 +262,7 @@ def _add_and_update_paths_and_hashes(current_commit, hashes_queries, hashes_by_p
       A list of dictionaries, where each dictionary contains information of one path object
       which is to be inserted into the database.
   """
+
   current_commit.save()
 
   if len(hashes_queries):
