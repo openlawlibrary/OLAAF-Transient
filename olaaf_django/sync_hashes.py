@@ -235,16 +235,23 @@ def _insert_diff_hashes(publication, repo, prev_commit, current_commit):
 
     # limit size of hashes_by_paths_and_types
     if sys.getsizeof(hashes_by_paths_and_types) >= MAX_HASHES_LIST_SIZE_IN_BYTES:
+      # insert into db
       if current_query is not None:
         hashes_queries.append(current_query)
-
       _add_and_update_paths_and_hashes(current_commit, hashes_queries, hashes_by_paths_and_types,
-                                      added_files_paths)
+                                       added_files_paths)
       # reset variables
       current_query = None
       hashes_queries.clear()
       hashes_by_paths_and_types.clear()
       added_files_paths.clear()
+
+  # insert into db
+  if len(hashes_by_paths_and_types) > 0:
+    if current_query is not None:
+      hashes_queries.append(current_query)
+    _add_and_update_paths_and_hashes(current_commit, hashes_queries, hashes_by_paths_and_types,
+                                    added_files_paths)
 
 
 @transaction.atomic
