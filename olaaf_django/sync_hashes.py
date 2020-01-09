@@ -1,10 +1,10 @@
 import pathlib
+import re
+import sys
 import tempfile
 import uuid
-import re
 from datetime import datetime
 from urllib.parse import urlparse
-
 
 from django.db import transaction
 from django.db.models import Q
@@ -26,6 +26,7 @@ EMPTY_TREE_SHA = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 # currently supported file types
 SUPPORTED_TYPES = ['html', 'pdf']
 MAX_QUERIES = 500
+MAX_HASHES_LIST_SIZE_IN_BYTES = 100 * 1024 # 100mb
 
 
 def sync_hashes(repo_path):
@@ -232,11 +233,18 @@ def _insert_diff_hashes(publication, repo, prev_commit, current_commit):
       if rendered_hash is not None:
         hashes_by_paths_and_types[(posix_path, Hash.RENDERED)] = rendered_hash
 
-  if current_query is not None:
-    hashes_queries.append(current_query)
+    # limit size of hashes_by_paths_and_types
+    if sys.getsizeof(hashes_by_paths_and_types) >= MAX_HASHES_LIST_SIZE_IN_BYTES:
+      if current_query is not None:
+        hashes_queries.append(current_query)
 
-  _add_and_update_paths_and_hashes(current_commit, hashes_queries, hashes_by_paths_and_types,
-                                   added_files_paths)
+      _add_and_update_paths_and_hashes(current_commit, hashes_queries, hashes_by_paths_and_types,
+                                      added_files_paths)
+      # reset variables
+      current_query = None
+      hashes_queries.clear()
+      hashes_by_paths_and_types.clear()
+      added_files_paths.clear()
 
 
 @transaction.atomic
