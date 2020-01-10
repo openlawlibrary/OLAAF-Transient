@@ -72,6 +72,7 @@ def _sync_hashes_for_publication(repo, publication, publication_commits, chrome_
     prev_commit = Commit(sha=EMPTY_TREE_SHA)
   else:
     prev_commit = inserted_commits[-1]
+
   for commit in publication_commits[inserted_commits_num + 1::]:
     # TODO
     # We should not use commit date here since it has not been authenticated
@@ -92,8 +93,17 @@ def _sync_hashes_for_publication(repo, publication, publication_commits, chrome_
     date = commit_date if is_iso_date(commit_date) else None
     if date is None:
       continue
+
     current_commit = Commit(publication=publication, sha=commit.hexsha, date=date)
-    _insert_diff_hashes(publication, repo, prev_commit, current_commit, chrome_driver)
+    current_commit.save()
+
+    try:
+      _insert_diff_hashes(publication, repo, prev_commit, current_commit, chrome_driver)
+    except Exception:
+      # Deletes commit and its hashes, but keeps paths
+      current_commit.delete()
+      raise
+
     prev_commit = current_commit
 
 
@@ -278,8 +288,6 @@ def _add_and_update_paths_and_hashes(current_commit, hashes_queries, hashes_by_p
       A list of dictionaries, where each dictionary contains information of one path object
       which is to be inserted into the database.
   """
-
-  current_commit.save()
 
   if len(hashes_queries):
     # find all hashes which were modified or deleted
