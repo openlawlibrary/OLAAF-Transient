@@ -1,10 +1,10 @@
 import pathlib
+import re
+import sys
 import tempfile
 import uuid
-import re
 from datetime import datetime
 from urllib.parse import urlparse
-
 
 from django.db import transaction
 from django.db.models import Q
@@ -20,12 +20,12 @@ from olaaf_django.utils import (calc_hash, get_auth_div_content,
 chrome_options = Options()
 chrome_options.add_argument("--headless")
 chrome_options.add_argument('--no-sandbox')
-driver = webdriver.Chrome(chrome_options=chrome_options)
 
 EMPTY_TREE_SHA = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 # currently supported file types
 SUPPORTED_TYPES = ['html', 'pdf']
 MAX_QUERIES = 500
+MAX_HASHES_LIST_SIZE_IN_BYTES = 100 * 1024 # 100mb
 
 
 def sync_hashes(repo_path):
@@ -44,18 +44,19 @@ def sync_hashes(repo_path):
 
   repository, _ = Repository.objects.get_or_create(name=repo_name)
 
-  # Call sync hashes for all publications
-  for pub_branch in _find_all_publication_branches(repo):
-    publication_commits = list(repo.iter_commits(pub_branch, reverse=True))
-    commit_date = publication_commits[0].committed_datetime.date()
-    publication_name = pub_branch.rsplit('/', 1)[1]
-    publication, _ = Publication.objects.get_or_create(repository=repository,
-                                                       name=publication_name,
-                                                       date=commit_date)
-    _sync_hashes_for_publication(repo, publication, publication_commits)
+  with webdriver.Chrome(chrome_options=chrome_options) as chrome_driver:
+    # Call sync hashes for all publications
+    for pub_branch in _find_all_publication_branches(repo):
+      publication_commits = list(repo.iter_commits(pub_branch, reverse=True))
+      commit_date = publication_commits[0].committed_datetime.date()
+      publication_name = pub_branch.rsplit('/', 1)[1]
+      publication, _ = Publication.objects.get_or_create(repository=repository,
+                                                        name=publication_name,
+                                                        date=commit_date)
+      _sync_hashes_for_publication(repo, publication, publication_commits, chrome_driver)
 
 
-def _sync_hashes_for_publication(repo, publication, publication_commits):
+def _sync_hashes_for_publication(repo, publication, publication_commits, chrome_driver):
   # check if commits are already in the database
   # if they are, see if there are commits which have not been inserted yet
   # if not, insert the hashes from the beginning
@@ -71,6 +72,7 @@ def _sync_hashes_for_publication(repo, publication, publication_commits):
     prev_commit = Commit(sha=EMPTY_TREE_SHA)
   else:
     prev_commit = inserted_commits[-1]
+
   for commit in publication_commits[inserted_commits_num + 1::]:
     # TODO
     # We should not use commit date here since it has not been authenticated
@@ -91,8 +93,17 @@ def _sync_hashes_for_publication(repo, publication, publication_commits):
     date = commit_date if is_iso_date(commit_date) else None
     if date is None:
       continue
+
     current_commit = Commit(publication=publication, sha=commit.hexsha, date=date)
-    _insert_diff_hashes(publication, repo, prev_commit, current_commit)
+    current_commit.save()
+
+    try:
+      _insert_diff_hashes(publication, repo, prev_commit, current_commit, chrome_driver)
+    except Exception:
+      # Deletes commit and its hashes, but keeps paths
+      current_commit.delete()
+      raise
+
     prev_commit = current_commit
 
 
@@ -131,7 +142,7 @@ def _check_if_valid_publication_branch_name(branch_name):
 
 
 
-def _insert_diff_hashes(publication, repo, prev_commit, current_commit):
+def _insert_diff_hashes(publication, repo, prev_commit, current_commit, chrome_driver):
   """
   <Purpose>
     Inserts and updates hashes for each document that was added, modified
@@ -191,7 +202,8 @@ def _insert_diff_hashes(publication, repo, prev_commit, current_commit):
     # its hash(es) and, if the file is an html file which was added, to read its url
     if action != 'D':
       file_content, doc = _get_file_content_and_document(repo, current_commit.sha,
-                                                         posix_path, file_type)
+                                                         posix_path, file_type,
+                                                         chrome_driver)
 
     if action == 'A':
       # If a new file was added, create a new path object. Calculating url here might be unnecessary
@@ -232,11 +244,25 @@ def _insert_diff_hashes(publication, repo, prev_commit, current_commit):
       if rendered_hash is not None:
         hashes_by_paths_and_types[(posix_path, Hash.RENDERED)] = rendered_hash
 
-  if current_query is not None:
-    hashes_queries.append(current_query)
+    # limit size of hashes_by_paths_and_types
+    if sys.getsizeof(hashes_by_paths_and_types) >= MAX_HASHES_LIST_SIZE_IN_BYTES:
+      # insert into db
+      if current_query is not None:
+        hashes_queries.append(current_query)
+      _add_and_update_paths_and_hashes(current_commit, hashes_queries, hashes_by_paths_and_types,
+                                       added_files_paths)
+      # reset variables
+      current_query = None
+      hashes_queries.clear()
+      hashes_by_paths_and_types.clear()
+      added_files_paths.clear()
 
-  _add_and_update_paths_and_hashes(current_commit, hashes_queries, hashes_by_paths_and_types,
-                                   added_files_paths)
+  # insert into db
+  if len(hashes_by_paths_and_types) > 0:
+    if current_query is not None:
+      hashes_queries.append(current_query)
+    _add_and_update_paths_and_hashes(current_commit, hashes_queries, hashes_by_paths_and_types,
+                                    added_files_paths)
 
 
 @transaction.atomic
@@ -262,8 +288,6 @@ def _add_and_update_paths_and_hashes(current_commit, hashes_queries, hashes_by_p
       A list of dictionaries, where each dictionary contains information of one path object
       which is to be inserted into the database.
   """
-
-  current_commit.save()
 
   if len(hashes_queries):
     # find all hashes which were modified or deleted
@@ -352,7 +376,7 @@ def _calculate_html_url(path):
   return path.rsplit('.', 1)[0]
 
 
-def _get_file_content_and_document(repo, commit_sha, file_path, file_type):
+def _get_file_content_and_document(repo, commit_sha, file_path, file_type, chrome_driver):
   """
   <Purpose>
     Read content of a file at a given revision. If that file is an html file,
@@ -375,12 +399,12 @@ def _get_file_content_and_document(repo, commit_sha, file_path, file_type):
   if file_type == 'html':
     # If the file is an html file, get the document object so that it's possible to find
     # elements such as authentication div, search path and url
-    doc = _get_document(file_content)
+    doc = _get_document(file_content, chrome_driver)
 
   return file_content, doc
 
 
-def _get_document(file_content):
+def _get_document(file_content, chrome_driver):
   """
   <Purpose>
     Creates an lxml document object given content of an html file.
@@ -400,8 +424,8 @@ def _get_document(file_content):
   try:
     with open(str(file_path), 'wb') as f:
       f.write(file_content)
-    driver.get(f'file://{file_path}')
-    page_source = driver.page_source
+    chrome_driver.get(f'file://{file_path}')
+    page_source = chrome_driver.page_source
     return get_html_document(page_source)
   finally:
     file_path.unlink()
