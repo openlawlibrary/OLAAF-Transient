@@ -126,7 +126,7 @@ def _find_all_publication_branches(repo):
   return pub_branches
 
 
-PUBLICATION_BRANCH_NAME = r'^publication\/(?P<pub_date>\d{4}-\d{2})(-\d{2})?$'
+PUBLICATION_BRANCH_NAME = r'^publication\/(?P<pub_date>\d{4}-\d{2}-\d{2})(-\d{2})?$'
 PUBLICATION_BRANCH_NAME_RE = re.compile(PUBLICATION_BRANCH_NAME)
 
 
@@ -135,7 +135,7 @@ def _check_if_valid_publication_branch_name(branch_name):
     if not match:
       return False
     try:
-      datetime.strptime(match.group('pub_date'), '%Y-%m')
+      datetime.strptime(match.group('pub_date'), '%Y-%m-%d')
     except ValueError:
       return False
     return True
