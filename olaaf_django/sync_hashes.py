@@ -51,9 +51,25 @@ def sync_hashes(repo_path):
       commit_date = publication_commits[0].committed_datetime.date()
       publication_name = pub_branch.rsplit('/', 1)[1]
       publication, _ = Publication.objects.get_or_create(repository=repository,
-                                                        name=publication_name,
-                                                        date=commit_date)
+                                                         name=publication_name,
+                                                         date=commit_date)
       _sync_hashes_for_publication(repo, publication, publication_commits, chrome_driver)
+
+      # Mark publications on the same date as revoked
+      _revoke_same_date_publications(publication)
+
+
+def _revoke_same_date_publications(publication):
+  def _get_same_date_publication():
+    for pub in (
+      Publication.objects
+      .filter(date=publication.date, revoked=False)
+      .order_by('-name')[1:]
+    ):
+      pub.revoked = True
+      yield pub
+
+  Publication.objects.bulk_update(_get_same_date_publication(), ['revoked'], batch_size=10)
 
 
 def _sync_hashes_for_publication(repo, publication, publication_commits, chrome_driver):

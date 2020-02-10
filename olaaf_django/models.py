@@ -24,6 +24,7 @@ class Repository(models.Model):
 class Publication(models.Model):
   name = models.CharField(max_length=10)
   date = models.DateField()
+  revoked = models.BooleanField(default=False)
   repository = models.ForeignKey(Repository, on_delete=models.CASCADE)
 
   class Meta:
