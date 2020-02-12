@@ -51,9 +51,25 @@ def sync_hashes(repo_path):
       commit_date = publication_commits[0].committed_datetime.date()
       publication_name = pub_branch.rsplit('/', 1)[1]
       publication, _ = Publication.objects.get_or_create(repository=repository,
-                                                        name=publication_name,
-                                                        date=commit_date)
+                                                         name=publication_name,
+                                                         date=commit_date)
       _sync_hashes_for_publication(repo, publication, publication_commits, chrome_driver)
+
+      # Mark publications on the same date as revoked
+      _revoke_same_date_publications(publication)
+
+
+def _revoke_same_date_publications(publication):
+  def _get_same_date_publication():
+    for pub in (
+      Publication.objects
+      .filter(date=publication.date, revoked=False)
+      .order_by('-name')[1:]
+    ):
+      pub.revoked = True
+      yield pub
+
+  Publication.objects.bulk_update(_get_same_date_publication(), ['revoked'], batch_size=10)
 
 
 def _sync_hashes_for_publication(repo, publication, publication_commits, chrome_driver):
@@ -108,37 +124,47 @@ def _sync_hashes_for_publication(repo, publication, publication_commits, chrome_
 
 
 def _find_all_publication_branches(repo):
+  local_branches = [branch.name for branch in repo.branches]
   remote_branches = repo.git.branch('-r')
-  if remote_branches:
-    remote_branches = [branch.strip() for branch in remote_branches.split('\n') if 'HEAD' not in branch]
-  local_branches = repo.branches
+  remote_branches = [
+    branch.strip().split('/', 1)[1] for branch in remote_branches.split('\n')
+    if 'HEAD' not in branch
+  ] if remote_branches else []
+
+  # get publication branches
+  branches = [
+    b for b in set(remote_branches + local_branches)
+    if _check_if_valid_publication_branch_name(b)
+  ]
+  # sort by 'publication/2019-01-01' first and then '-01' index
+  branches = sorted(branches, key=lambda x: (x[:22], x[22:]))
+
   pub_branches = []
-  for branch in local_branches:
-    branch_name = branch.name
-    if (_check_if_valid_publication_branch_name(branch_name)):
-      pub_branches.append(branch_name)
-  for branch_name in remote_branches:
-    branch_local_name = branch_name.split('/', 1)[1]
-    if branch_local_name in pub_branches:
-      continue
-    if (_check_if_valid_publication_branch_name(branch_local_name)):
-      pub_branches.append(branch_name)
+  # skip a same date publications with the lower index
+  for idx, b in enumerate(branches):
+    try:
+      if b[:22] in branches[idx+1]:
+        continue
+    except IndexError:
+      pass
+    pub_branches.append(b)
+
   return pub_branches
 
 
-PUBLICATION_BRANCH_NAME = r'^publication\/(?P<pub_date>\d{4}-\d{2})(-\d{2})?$'
+PUBLICATION_BRANCH_NAME = r'^publication\/(?P<pub_date>\d{4}-\d{2}-\d{2})(-\d{2})?$'
 PUBLICATION_BRANCH_NAME_RE = re.compile(PUBLICATION_BRANCH_NAME)
 
 
 def _check_if_valid_publication_branch_name(branch_name):
-    match = PUBLICATION_BRANCH_NAME_RE.match(branch_name)
-    if not match:
-      return False
-    try:
-      datetime.strptime(match.group('pub_date'), '%Y-%m')
-    except ValueError:
-      return False
-    return True
+  match = PUBLICATION_BRANCH_NAME_RE.match(branch_name)
+  if not match:
+    return False
+  try:
+    datetime.strptime(match.group('pub_date'), '%Y-%m-%d')
+  except ValueError:
+    return False
+  return True
 
 
 
