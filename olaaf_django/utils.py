@@ -91,6 +91,14 @@ def is_iso_date(date):
     return False
 
 
+def remove_endings(input_str, endings=('index.html', '.full.html', '.full.html', '.html', '.htm')):
+  """Removes `endings` from string if exists."""
+  for ending in endings:
+    if input_str.endswith(ending):
+      input_str = input_str[:-len(ending)]
+  return input_str
+
+
 URL_PREFIX = lambda date, doc=None: f'/_date/{date}' if doc is None else f'/_date/{date}/_doc/{doc}'  # noqa
 
 def reset_local_urls(html_doc_str, date, doc=None):

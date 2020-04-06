@@ -1,13 +1,18 @@
 from django.core.validators import MinLengthValidator
 from django.db import models
 
+from olaaf_django.utils import remove_endings
+
 
 class LowerCharField(models.CharField):
-  def __init__(self, *args, **kwargs):
-    super().__init__(*args, **kwargs)
-
   def get_prep_value(self, value):
     return str(value).lower()
+
+
+class PathUrlField(LowerCharField):
+  def get_prep_value(self, value):
+    value = super().get_prep_value(value)
+    return remove_endings(value).rstrip('/').lstrip('/')
 
 
 class Repository(models.Model):
@@ -57,7 +62,7 @@ class Commit(models.Model):
 
 class Path(models.Model):
   filesystem = models.CharField(max_length=260)
-  url = LowerCharField(max_length=260)
+  url = PathUrlField(max_length=260)
   search_path = LowerCharField(max_length=200, null=True)
   citation = LowerCharField(max_length=100, null=True)
   publication = models.ForeignKey(Publication, on_delete=models.CASCADE)
