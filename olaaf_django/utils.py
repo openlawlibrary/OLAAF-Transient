@@ -91,7 +91,7 @@ def is_iso_date(date):
     return False
 
 
-def remove_endings(input_str, endings=('index.html', '.full.html', '.full.html', '.html', '.htm')):
+def remove_endings(input_str, endings=('index.html', 'index.full.html', '.full.html', '.html', '.htm')):
   """Removes `endings` from string if exists."""
   for ending in endings:
     if input_str.endswith(ending):
