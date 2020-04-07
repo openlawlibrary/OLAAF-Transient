@@ -127,14 +127,14 @@ def _sync_hashes_for_publication(repo, publication, publication_commits, chrome_
 def _find_all_publication_branches(repo):
   local_branches = [branch.name for branch in repo.branches]
   remote_branches = repo.git.branch('-r')
-  remote_branches = [
-      branch.strip().split('/', 1)[1] for branch in remote_branches.split('\n')
-      if 'HEAD' not in branch
-  ] if remote_branches else []
+  remote_branches = {
+      branch.strip().split('/', 1)[1]: branch.strip()
+      for branch in remote_branches.split('\n') if 'HEAD' not in branch
+  } if remote_branches else {}
 
   # get publication branches
   branches = [
-      b for b in set(remote_branches + local_branches)
+      b for b in set(list(remote_branches.keys()) + local_branches)
       if _check_if_valid_publication_branch_name(b)
   ]
   # sort by 'publication/2019-01-01' first and then '-01' index
@@ -148,6 +148,11 @@ def _find_all_publication_branches(repo):
         continue
     except IndexError:
       pass
+
+    # if branch does not exist locally, add remote branch name
+    if b not in local_branches:
+      b = remote_branches[b]
+
     pub_branches.append(b)
 
   return pub_branches
