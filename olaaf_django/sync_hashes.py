@@ -73,6 +73,7 @@ def _revoke_same_date_publications(publication):
   Publication.objects.bulk_update(_get_same_date_publication(), ['revoked'], batch_size=10)
 
 
+@timed_run()
 def _sync_hashes_for_publication(repo, publication, publication_commits, chrome_driver):
   # check if commits are already in the database
   # if they are, see if there are commits which have not been inserted yet
