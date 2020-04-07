@@ -114,11 +114,13 @@ class timed_run:
   def start(self):
     self.start_time = time.time()
     if self.start_message is not None:
+      print()
       print(self.start_message)
 
   def end(self):
     self.elapsed_time = time.time() - self.start_time
     if self.end_message is not None:
+      print()
       print(self.end_message.format(int(self.elapsed_time)))
 
   def __call__(self, orig_func=None):
