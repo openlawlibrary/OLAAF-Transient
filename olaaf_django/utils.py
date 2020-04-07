@@ -1,6 +1,8 @@
 import datetime as dt
 import hashlib
 import html
+import time
+from functools import wraps
 
 from lxml import etree as et
 
@@ -99,7 +101,39 @@ def remove_endings(input_str, endings=('index.html', 'index.full.html', '.full.h
   return input_str
 
 
-URL_PREFIX = lambda date, doc=None: f'/_date/{date}' if doc is None else f'/_date/{date}/_doc/{doc}'  # noqa
+class timed_run:
+  """Decorator to let us capture the elapsed time and optionally print a timer and start/end
+     messages around function calls"""
+
+  def __init__(self, start_message=None, end_message='  completed in {} seconds'):
+    self.start_message = start_message
+    self.end_message = end_message
+    self.start_time = None
+    self.elapsed_time = None
+
+  def start(self):
+    self.start_time = time.time()
+    if self.start_message is not None:
+      print(self.start_message)
+
+  def end(self):
+    self.elapsed_time = time.time() - self.start_time
+    if self.end_message is not None:
+      print(self.end_message.format(int(self.elapsed_time)))
+
+  def __call__(self, orig_func=None):
+    @wraps(orig_func)
+    def wrapper_func(*args, **kwargs):
+      self.start()
+      result = orig_func(*args, **kwargs) if orig_func else None
+      self.end()
+      return result
+    return wrapper_func
+
+
+def URL_PREFIX(date, doc=None):
+  return f'/_date/{date}' if doc is None else f'/_date/{date}/_doc/{doc}'  # noqa
+
 
 def reset_local_urls(html_doc_str, date, doc=None):
   """
