@@ -15,7 +15,7 @@ from selenium.webdriver.chrome.options import Options
 
 from olaaf_django.models import Commit, Hash, Path, Publication, Repository
 from olaaf_django.utils import (calc_hash, get_auth_div_content,
-                                get_html_document, is_iso_date)
+                                get_html_document, is_iso_date, timed_run)
 
 chrome_options = Options()
 chrome_options.add_argument("--headless")
@@ -25,9 +25,10 @@ EMPTY_TREE_SHA = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
 # currently supported file types
 SUPPORTED_TYPES = ['html', 'pdf']
 MAX_QUERIES = 500
-MAX_HASHES_LIST_SIZE_IN_BYTES = 100 * 1024 # 100mb
+MAX_HASHES_LIST_SIZE_IN_BYTES = 100 * 1024  # 100mb
 
 
+@timed_run()
 def sync_hashes(repo_path):
   """
   Given a path of an html repository, gets the publication branches and
@@ -62,9 +63,9 @@ def sync_hashes(repo_path):
 def _revoke_same_date_publications(publication):
   def _get_same_date_publication():
     for pub in (
-      Publication.objects
-      .filter(date=publication.date, revoked=False)
-      .order_by('-name')[1:]
+        Publication.objects
+        .filter(date=publication.date, revoked=False)
+        .order_by('-name')[1:]
     ):
       pub.revoked = True
       yield pub
@@ -76,7 +77,7 @@ def _sync_hashes_for_publication(repo, publication, publication_commits, chrome_
   # check if commits are already in the database
   # if they are, see if there are commits which have not been inserted yet
   # if not, insert the hashes from the beginning
-  print(f'Syncing hashes of publication {publication.name}')
+  print(f'\nSyncing hashes of publication {publication.name}\n')
   inserted_commits = Commit.objects.filter(publication=publication)[::1]
   if len(inserted_commits) == len(publication_commits):
     print('All commits have been loaded into the database')
@@ -127,14 +128,14 @@ def _find_all_publication_branches(repo):
   local_branches = [branch.name for branch in repo.branches]
   remote_branches = repo.git.branch('-r')
   remote_branches = [
-    branch.strip().split('/', 1)[1] for branch in remote_branches.split('\n')
-    if 'HEAD' not in branch
+      branch.strip().split('/', 1)[1] for branch in remote_branches.split('\n')
+      if 'HEAD' not in branch
   ] if remote_branches else []
 
   # get publication branches
   branches = [
-    b for b in set(remote_branches + local_branches)
-    if _check_if_valid_publication_branch_name(b)
+      b for b in set(remote_branches + local_branches)
+      if _check_if_valid_publication_branch_name(b)
   ]
   # sort by 'publication/2019-01-01' first and then '-01' index
   branches = sorted(branches, key=lambda x: (x[:22], x[22:]))
@@ -165,7 +166,6 @@ def _check_if_valid_publication_branch_name(branch_name):
   except ValueError:
     return False
   return True
-
 
 
 def _insert_diff_hashes(publication, repo, prev_commit, current_commit, chrome_driver):
@@ -288,7 +288,7 @@ def _insert_diff_hashes(publication, repo, prev_commit, current_commit, chrome_d
     if current_query is not None:
       hashes_queries.append(current_query)
     _add_and_update_paths_and_hashes(current_commit, hashes_queries, hashes_by_paths_and_types,
-                                    added_files_paths)
+                                     added_files_paths)
 
 
 @transaction.atomic
