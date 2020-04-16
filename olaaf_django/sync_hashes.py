@@ -112,8 +112,11 @@ def _sync_hashes_for_publication(repo, publication, publication_commits, chrome_
     if date is None:
       continue
 
-    current_commit = Commit(publication=publication, sha=commit.hexsha, date=date)
-    current_commit.save()
+    current_commit, created = Commit.objects.get_or_create(
+        publication=publication, sha=commit.hexsha, date=date
+    )
+    if created:
+      current_commit.save()
 
     try:
       _insert_diff_hashes(publication, repo, prev_commit, current_commit, chrome_driver)
@@ -270,8 +273,7 @@ def _insert_diff_hashes(publication, repo, prev_commit, current_commit, chrome_d
         current_query_length += 1
 
     if action != 'D':
-      bitstream_hash, rendered_hash = _calculate_file_hashes(
-          file_content, doc)
+      bitstream_hash, rendered_hash = _calculate_file_hashes(file_content, doc)
       hashes_by_paths_and_types[(posix_path, Hash.BITSTREAM)] = bitstream_hash
       if rendered_hash is not None:
         hashes_by_paths_and_types[(posix_path, Hash.RENDERED)] = rendered_hash
@@ -281,7 +283,8 @@ def _insert_diff_hashes(publication, repo, prev_commit, current_commit, chrome_d
       # insert into db
       if current_query is not None:
         hashes_queries.append(current_query)
-      _add_and_update_paths_and_hashes(current_commit, hashes_queries, hashes_by_paths_and_types,
+      _add_and_update_paths_and_hashes(current_commit, hashes_queries,
+                                       hashes_by_paths_and_types,
                                        added_files_paths)
       # reset variables
       current_query = None
