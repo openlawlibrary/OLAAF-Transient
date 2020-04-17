@@ -3,6 +3,8 @@ import re
 import sys
 import tempfile
 import uuid
+import logging
+
 from datetime import datetime
 from urllib.parse import urlparse
 
@@ -16,6 +18,9 @@ from selenium.webdriver.chrome.options import Options
 from olaaf_django.models import Commit, Hash, Path, Publication, Repository
 from olaaf_django.utils import (calc_hash, get_auth_div_content,
                                 get_html_document, is_iso_date, timed_run)
+
+
+logger = logging.getLogger(__name__)
 
 chrome_options = Options()
 chrome_options.add_argument("--headless")
@@ -43,6 +48,7 @@ def sync_hashes(repo_path):
   repo_name = '{}/{}'.format(repo_path.parent.name, repo_path.name)
   repo = Repo(str(repo_path))
 
+  logger.info('Syncing hashes of repository %s', repo_path)
   repository, _ = Repository.objects.get_or_create(name=repo_name)
 
   with webdriver.Chrome(chrome_options=chrome_options) as chrome_driver:
@@ -51,9 +57,10 @@ def sync_hashes(repo_path):
       publication_commits = list(repo.iter_commits(pub_branch, reverse=True))
       commit_date = publication_commits[0].committed_datetime.date()
       publication_name = pub_branch.rsplit('/', 1)[1]
+      logger.debug('Found publication %s', publication_name) 
       publication, _ = Publication.objects.get_or_create(repository=repository,
                                                          name=publication_name,
-                                                         date=commit_date)
+                                                         date=commit_date)                                                        
       _sync_hashes_for_publication(repo, publication, publication_commits, chrome_driver)
 
       # Mark publications on the same date as revoked
@@ -78,9 +85,12 @@ def _sync_hashes_for_publication(repo, publication, publication_commits, chrome_
   # check if commits are already in the database
   # if they are, see if there are commits which have not been inserted yet
   # if not, insert the hashes from the beginning
+  logger.info('Syncing hashes of publication %s', publication.name)
   print(f'\nSyncing hashes of publication {publication.name}\n')
   inserted_commits = Commit.objects.filter(publication=publication)[::1]
   if len(inserted_commits) == len(publication_commits):
+    logger.ingo('All commits of publication %s have been loaded into the databse',
+                publication.name)
     print('All commits have been loaded into the database')
     return
 
@@ -90,6 +100,8 @@ def _sync_hashes_for_publication(repo, publication, publication_commits, chrome_
     prev_commit = Commit(sha=EMPTY_TREE_SHA)
   else:
     prev_commit = inserted_commits[-1]
+  
+  logger.debug('Last inserted commit of publication %s: %s', publication.name, prev_commit)
 
   for commit in publication_commits[inserted_commits_num + 1::]:
     # TODO
@@ -98,10 +110,12 @@ def _sync_hashes_for_publication(repo, publication, publication_commits, chrome_
     # Since this is going to be changed soon, not making an effort to check if that date
     # already exists. We have not yet implemented anything that would be affected by the
     # missing counter
+    logger.info('Current commit: %s', commit.hexsha)
     commit_msg = commit.message.strip()
     # skip emtpy publication initialization commit
     # this will be after above mentioned refactoring
     if commit_msg.startswith('publication'):
+      logger.debug('Skipping commit %s as it is empty', commit.hexsha)
       continue
     split_commit_msg = commit_msg.split('/')
     if len(split_commit_msg) == 1:
@@ -112,14 +126,21 @@ def _sync_hashes_for_publication(repo, publication, publication_commits, chrome_
     if date is None:
       continue
 
+    logger.debug('Inserting commit sha=%s, date=%s into publication %s', commit.hexsha, date,
+                 publication.name)
     current_commit = Commit(publication=publication, sha=commit.hexsha, date=date)
     current_commit.save()
 
     try:
       _insert_diff_hashes(publication, repo, prev_commit, current_commit, chrome_driver)
-    except Exception:
+    except Exception as e:
       # Deletes commit and its hashes, but keeps paths
-      current_commit.delete()
+      logger.error('And error occurred while inserting hashes: %s', str(e))
+      logger.info('Deleting commit %s', current_commit)
+      try:
+        current_commit.delete()
+      except Exception as e:
+        logger.error('And error occurred while deleting commit %s', current_commit)
       raise
 
     prev_commit = current_commit
@@ -191,6 +212,7 @@ def _insert_diff_hashes(publication, repo, prev_commit, current_commit, chrome_d
     current_commit:
       The current commit
   """
+  logger.info('Inserting hashes. Commit: %s, previous commit %s', current_commit, prev_commit)
 
   print('Inserting diff hashes. Previous commit {} current commit {}'.format(prev_commit,
                                                                              current_commit))
@@ -320,6 +342,10 @@ def _add_and_update_paths_and_hashes(current_commit, hashes_queries, hashes_by_p
       A list of dictionaries, where each dictionary contains information of one path object
       which is to be inserted into the database.
   """
+
+  logger.debug('Inserting or updating hashes. hashes_queries number: %s, added_files_paths '
+               'number: %s', len(hashes_queries), len(added_files_paths))
+  logger.debug('hashes_by_paths_and_types size: %s MB', sys.getsizeof(hashes_by_paths_and_types) / 1024)
 
   if len(hashes_queries):
     # find all hashes which were modified or deleted
