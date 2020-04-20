@@ -89,7 +89,7 @@ def _sync_hashes_for_publication(repo, publication, publication_commits, chrome_
   print(f'\nSyncing hashes of publication {publication.name}\n')
   inserted_commits = Commit.objects.filter(publication=publication)[::1]
   if len(inserted_commits) == len(publication_commits):
-    logger.ingo('All commits of publication %s have been loaded into the databse',
+    logger.info('All commits of publication %s have been loaded into the database',
                 publication.name)
     print('All commits have been loaded into the database')
     return
