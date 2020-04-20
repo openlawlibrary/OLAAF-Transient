@@ -57,10 +57,9 @@ def sync_hashes(repo_path):
       publication_commits = list(repo.iter_commits(pub_branch, reverse=True))
       commit_date = publication_commits[0].committed_datetime.date()
       publication_name = pub_branch.rsplit('/', 1)[1]
-      logger.debug('Found publication %s', publication_name) 
       publication, _ = Publication.objects.get_or_create(repository=repository,
                                                          name=publication_name,
-                                                         date=commit_date)                                                        
+                                                         date=commit_date)
       _sync_hashes_for_publication(repo, publication, publication_commits, chrome_driver)
 
       # Mark publications on the same date as revoked
@@ -74,6 +73,7 @@ def _revoke_same_date_publications(publication):
         .filter(date=publication.date, revoked=False)
         .order_by('-name')[1:]
     ):
+      logger.info('Marking publication %s as revoked', pub.name)
       pub.revoked = True
       yield pub
 
@@ -100,7 +100,7 @@ def _sync_hashes_for_publication(repo, publication, publication_commits, chrome_
     prev_commit = Commit(sha=EMPTY_TREE_SHA)
   else:
     prev_commit = inserted_commits[-1]
-  
+
   logger.debug('Last inserted commit of publication %s: %s', publication.name, prev_commit)
 
   for commit in publication_commits[inserted_commits_num + 1::]:
@@ -140,18 +140,23 @@ def _sync_hashes_for_publication(repo, publication, publication_commits, chrome_
       _insert_diff_hashes(publication, repo, prev_commit, current_commit, chrome_driver)
     except Exception as e:
       # Deletes commit and its hashes, but keeps paths
-      logger.error('And error occurred while inserting hashes: %s', str(e))
+      logger.error('And error occurred while inserting hashes of commit %s: %s',
+                   current_commit, str(e))
       logger.info('Deleting commit %s', current_commit)
       try:
         current_commit.delete()
+        logger.info('Successfully deleted commit %s', current_commit)
       except Exception as e:
         logger.error('And error occurred while deleting commit %s', current_commit)
+        raise
       raise
 
+    logger.info('Successfully inserted hashes of commit %s', current_commit)
     prev_commit = current_commit
 
 
 def _find_all_publication_branches(repo):
+  logger.debug('Finding publication branches of repo %s', repo.git_dir)
   local_branches = [branch.name for branch in repo.branches]
   remote_branches = repo.git.branch('-r')
   remote_branches = {
@@ -166,12 +171,16 @@ def _find_all_publication_branches(repo):
   ]
   # sort by 'publication/2019-01-01' first and then '-01' index
   branches = sorted(branches, key=lambda x: (x[:22], x[22:]))
+  logger.debug('All publication branches: %s', ', '.join(branches))
 
   pub_branches = []
   # skip a same date publications with the lower index
   for idx, b in enumerate(branches):
     try:
-      if b[:22] in branches[idx+1]:
+      branch_wihtout_index = b[:22]
+      if branch_wihtout_index in branches[idx+1]:
+        logger.debug('Skipping publication branch %s as it was built on the same day '
+                     'as another branch with higher index', branch_wihtout_index)
         continue
     except IndexError:
       pass
@@ -182,6 +191,7 @@ def _find_all_publication_branches(repo):
 
     pub_branches.append(b)
 
+  logger.debug('Filtered publication branches: %s', ', '.join(pub_branches))
   return pub_branches
 
 
@@ -350,7 +360,7 @@ def _add_and_update_paths_and_hashes(current_commit, hashes_queries, hashes_by_p
 
   logger.debug('Inserting or updating hashes. hashes_queries number: %s, added_files_paths '
                'number: %s', len(hashes_queries), len(added_files_paths))
-  logger.debug('hashes_by_paths_and_types size: %s MB', sys.getsizeof(hashes_by_paths_and_types) / 1024)
+  logger.debug('hashes_by_paths_and_types size: %s KB', sys.getsizeof(hashes_by_paths_and_types) / 1024)
 
   if len(hashes_queries):
     # find all hashes which were modified or deleted
