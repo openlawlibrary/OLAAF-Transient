@@ -2,27 +2,33 @@ from django.db import models
 from django.db.models import Q, Subquery
 
 
+class PublicationQuerySet(models.QuerySet):
+  def by_repo_name(self, name):
+    return self.filter(repository__name=name)
+
+  def non_revoked(self):
+    return self.filter(revoked=False)
+
+  def with_latest_field(self):
+    return self.annotate(latest=Subquery(self.order_by('-name').values('name')[:1]))
+
+
 class PublicationManager(models.Manager):
   def __init__(self, repo_name=None, *args, **kwargs):
     self._repo_name = repo_name
     super().__init__(*args, **kwargs)
 
   def get_queryset(self):
+    queryset = PublicationQuerySet(model=self.model)
     if self._repo_name is not None:
-      queryset = super().get_queryset().filter(repository__name=self._repo_name, revoked=False)
-    # append latest publication's name as field
-    return queryset.annotate(
-        latest=Subquery(
-            queryset
-            .order_by('-name')
-            .values('name')[:1])
-    )
+      queryset = queryset.by_repo_name(self._repo_name)
+    return queryset
 
   def by_name_or_latest(self, name=None):
     try:
-      queryset = self.get_queryset()
+      queryset = self.get_queryset().non_revoked().with_latest_field()
 
-      if name is not None:
+      if name:
         queryset = (
             queryset
             .filter(
@@ -37,6 +43,9 @@ class PublicationManager(models.Manager):
       return queryset.order_by('-name').first()
     except (IndexError, TypeError):
       raise Publication.DoesNotExist
+
+  def non_revoked(self):
+    return self.get_queryset().non_revoked()
 
   @classmethod
   def factory(cls, model, repo_name=None):

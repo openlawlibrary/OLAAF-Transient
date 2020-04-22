@@ -43,7 +43,8 @@ class Publication(models.Model):
     ]
 
   def __str__(self):
-    return 'repository={}, name={}, date={}'.format(self.repository, self.name, self.date)
+    return 'repository={}, name={}, date={}, revoked={}'.format(
+        self.repository, self.name, self.date, self.revoked)
 
 
 class Commit(models.Model):
