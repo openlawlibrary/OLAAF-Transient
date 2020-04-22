@@ -3,6 +3,8 @@ from django.db import models
 
 from olaaf_django.utils import remove_endings
 
+from .managers import publication_manager_for_partner
+
 
 class LowerCharField(models.CharField):
   def get_prep_value(self, value):
@@ -31,6 +33,8 @@ class Publication(models.Model):
   date = models.DateField()
   revoked = models.BooleanField(default=False)
   repository = models.ForeignKey(Repository, on_delete=models.CASCADE)
+
+  for_partner = publication_manager_for_partner
 
   class Meta:
     unique_together = ('repository', 'name')
