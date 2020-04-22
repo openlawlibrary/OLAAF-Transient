@@ -1,5 +1,6 @@
-Django >= 2.2
-GitPython >= 2.1.11
-selenium >= 3.141.0
-lxml >= 4.3
+Django>=2.2
+GitPython>=2.1.11
+selenium>=3.141.0
+lxml>=4.3
 click==6.7
+taf>=0.3.1
