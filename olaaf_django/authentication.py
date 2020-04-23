@@ -1,6 +1,8 @@
 import datetime
 import mimetypes
 
+from django.http import HttpResponse
+from django.template import loader
 from lxml import etree as et
 
 from .models import Hash, Publication
@@ -11,7 +13,7 @@ HTML_CONTENT_TYPE = mimetypes.types_map.get('.html')
 PDF_CONTENT_TYPE = mimetypes.types_map.get('.pdf')
 
 
-def check_authenticity(publication, date, path, url, content, content_type):
+def check_authenticity(publication, pub_name, date, path, url, content, content_type):
   hashing_func = {
       HTML_CONTENT_TYPE: _calculate_html_hash,
       PDF_CONTENT_TYPE: _calculate_binary_content_hash
@@ -21,7 +23,7 @@ def check_authenticity(publication, date, path, url, content, content_type):
     return AuthenticationResponse(url, authenticable=False)
 
   if content_type == HTML_CONTENT_TYPE:
-    content = reset_local_urls(content, publication.name, date)
+    content = reset_local_urls(content, pub_name, date)
 
   try:
     hash_value = hashing_func(content)
@@ -84,3 +86,15 @@ class AuthenticationResponse():
     self.to_date = to_date
     self.url = url
     self.date = date
+
+  def to_http_response(self, request):
+    template = loader.get_template('olaaf_django/response.html')
+    context = {
+        'auth_response': self
+    }
+    resp = template.render(context, request)
+    response = HttpResponse(resp)
+    # addresses the CORS issue
+    # robably not the best good solution, but allows development
+    response["Access-Control-Allow-Origin"] = "*"
+    return response

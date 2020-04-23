@@ -1,12 +1,11 @@
 import re
 
 from django.http import Http404, HttpResponse
-from django.template import loader
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
 
 from . import get_repo_info
-from .authentication import check_authenticity
+from .authentication import AuthenticationResponse, check_authenticity
 from .models import Publication
 
 URL_RE = re.compile(
@@ -20,6 +19,10 @@ URL_RE = re.compile(
 @require_http_methods(['POST'])
 def authenticate(request):
   url = request.POST.get('url')
+
+  if url.startswith('/_compare'):
+    return AuthenticationResponse(url, authenticable=False).to_http_response(request)
+
   pub_name, date, path = _extract_url(url)
 
   try:
@@ -32,17 +35,9 @@ def authenticate(request):
   if content is None:
     content = request.FILES['content'].file.getvalue()
 
-  auth_response = check_authenticity(publication, date, path, url, content, content_type)
-  template = loader.get_template('olaaf_django/response.html')
-  context = {
-      'auth_response': auth_response
-  }
-  resp = template.render(context, request)
-  response = HttpResponse(resp)
-  # addresses the CORS issue
-  # robably not the best good solution, but allows development
-  response["Access-Control-Allow-Origin"] = "*"
-  return response
+  auth_response = check_authenticity(publication, pub_name, date, path, url, content, content_type)
+
+  return auth_response.to_http_response(request)
 
 
 def _extract_url(url):
