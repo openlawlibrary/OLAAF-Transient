@@ -4,8 +4,8 @@ import mimetypes
 from lxml import etree as et
 
 from .models import Hash, Publication
-from .utils import (calc_hash, get_auth_div_content, get_html_document,
-                    reset_local_urls, strip_binary_content)
+from .utils import (calc_hash, get_auth_div_content, get_html_document, reset_local_urls,
+                    strip_binary_content)
 
 HTML_CONTENT_TYPE = mimetypes.types_map.get('.html')
 PDF_CONTENT_TYPE = mimetypes.types_map.get('.pdf')
@@ -20,7 +20,7 @@ def check_authenticity(publication, date, path, url, content, content_type):
   if hashing_func is None:
     return AuthenticationResponse(url, authenticable=False)
 
-  if content_type == HTML_CONTENT_TYPE and date is not None:
+  if content_type == HTML_CONTENT_TYPE:
     content = reset_local_urls(content, publication.name, date)
 
   try:
@@ -50,7 +50,7 @@ def check_authenticity(publication, date, path, url, content, content_type):
   end_commit_date = hash_data[0]['end_commit__date']
 
   if date is None:
-    if end_commit_date is None:
+    if publication.name == publication.latest and end_commit_date is None:
       return AuthenticationResponse(url, authentic=True, current=True, from_date=start_commit_date)
     else:
       return AuthenticationResponse(url, authentic=True, from_date=start_commit_date,
