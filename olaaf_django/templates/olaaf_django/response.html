@@ -10,7 +10,7 @@ Not authentic on {{ auth_response.date }}
   {% else %}
     {% if auth_response.authentic %}
 Authentic{% if auth_response.current %} and {% else %}, but not {% endif %}current.
-Valid from {{ auth_response.from_date }}{% if not auth_response.current %} to {{ auth_response.to_date}}{% endif %}.
+Valid from {{ auth_response.from_date }}{% if not auth_response.current and auth_response.to_date %} to {{ auth_response.to_date}}{% endif %}.
     {% else %}
 Not authentic
     {% endif %}
