@@ -133,12 +133,16 @@ class timed_run:
     return wrapper_func
 
 
-def URL_PREFIX(date, doc=None):
-  return f'/_date/{date}' if doc is None else f'/_date/{date}/_doc/{doc}'  # noqa
+def URL_PREFIX(pub_name, date, doc=None):
+  pub_part = f'/_publication/{pub_name}' if pub_name else ''
+  date_part = f'/_date/{date}' if date else ''
+  doc_part = f'/_doc/{doc}' if doc else ''
+
+  return f'{pub_part}{date_part}{doc_part}'
 
 
-def reset_local_urls(html_doc_str, date, doc=None):
+def reset_local_urls(html_doc_str, pub_name, date, doc=None):
   """
   Remove `/_api/_date/<date>/_doc/<doc>` from all absolute local urls in the html document.
   """
-  return html_doc_str.replace(URL_PREFIX(date, doc), '')
+  return html_doc_str.replace(URL_PREFIX(pub_name, date, doc), '')

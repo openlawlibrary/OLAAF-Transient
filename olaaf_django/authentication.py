@@ -7,32 +7,40 @@ from .models import Hash, Publication
 from .utils import (calc_hash, get_auth_div_content, get_html_document,
                     reset_local_urls, strip_binary_content)
 
+HTML_CONTENT_TYPE = mimetypes.types_map.get('.html')
+PDF_CONTENT_TYPE = mimetypes.types_map.get('.pdf')
 
-def check_authenticity(publication, date, url, content):
-  if not url.startswith('/'):
-    url = '/' + url
-  content_type, _ = mimetypes.guess_type(url)
-  file_type = content_type.split('/')[1] if content_type is not None else 'html'
+
+def check_authenticity(publication, date, path, url, content, content_type):
   hashing_func = {
-      'html': _calculate_html_hash,
-      'pdf': _calculate_binary_content_hash
-  }.get(file_type)
+      HTML_CONTENT_TYPE: _calculate_html_hash,
+      PDF_CONTENT_TYPE: _calculate_binary_content_hash
+  }.get(content_type)
 
   if hashing_func is None:
     return AuthenticationResponse(url, authenticable=False)
 
-  if file_type == 'html' and date is not None:
-    content = reset_local_urls(content, date)
+  if content_type == HTML_CONTENT_TYPE and date is not None:
+    content = reset_local_urls(content, publication.name, date)
 
-  hash_value = hashing_func(content)
+  try:
+    hash_value = hashing_func(content)
+  except Exception:
+    return AuthenticationResponse(url, authenticable=False)
 
   if date is not None:
     date = datetime.datetime.strptime(date, '%Y-%m-%d').date()
 
-  hash_type = Hash.RENDERED if file_type == 'html' else Hash.BITSTREAM
-  hash_data = Hash.objects.filter(path__url=url, value=hash_value, hash_type=hash_type,
-                                  start_commit__publication=publication). \
-      values('start_commit__date', 'end_commit__date')
+  hash_type = Hash.RENDERED if content_type == HTML_CONTENT_TYPE else Hash.BITSTREAM
+  hash_data = (
+      Hash.objects
+      .filter(
+          path__url=path,
+          value=hash_value,
+          hash_type=hash_type,
+          start_commit__publication=publication)
+      .values('start_commit__date', 'end_commit__date')
+  )
 
   if not len(hash_data):
     # not authentic
