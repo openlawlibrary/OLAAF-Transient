@@ -20,10 +20,19 @@ OUTSIDE_TUF_AUTH_DIV_XPATH = "//div[@class='outside-tuf-authenticate']"
 # branches as keys | commits and changed files as values
 PUBLICATION_BRANCHES = {
     "publication/2020-01-01": {
-        "commit1": ["file1.html", "file3.html"],
-        "commit2": ["file2.html"],
-        "commit3": ["index.html"],
-        "commit4": ["file1.html"]
+        "commit1": [
+            ("file1.html", True),  # file name, change auth-div or not
+            ("file3.html", True)
+        ],
+        "commit2": [
+            ("file2.html", True)
+        ],
+        "commit3": [
+            ("index.html", True)
+        ],
+        "commit4": [
+            ("file1.html", False)
+        ]
     },
     # "publication/2020-01-01-01": {},
     # "publication/2020-05-05": {},
@@ -70,9 +79,9 @@ def _init_pub_branches(repo, branches=PUBLICATION_BRANCHES):
     repo.commit("Initial commit.")
 
     # commit
-    for msg, files in commits.items():
-      for f in files:
-        _change_file_content(REPOSITORY_PATH / f)
+    for msg, file_changes in commits.items():
+      for f_name, is_auth_change in file_changes:
+        _change_file_content(REPOSITORY_PATH / f_name, is_auth_change)
       repo.commit(msg)
 
 
