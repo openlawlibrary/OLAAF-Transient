@@ -80,7 +80,7 @@ class Path(models.Model):
     ]
 
   def __str__(self):
-    return 'filesystem path: {}, url={}, citation={}, publication={}, search_path={}'. \
+    return 'filesystem path: "{}", url="{}", citation="{}", publication="{}", search_path="{}"'. \
         format(self.filesystem, self.url, self.citation, self.publication, self.search_path)
 
 
