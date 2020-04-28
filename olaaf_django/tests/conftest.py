@@ -56,6 +56,11 @@ def repository():
     (REPOSITORY_PATH / ".gitkeep").touch()
 
 
+@pytest.fixture
+def publications():
+  return PUBLICATION_BRANCHES
+
+
 def _init_pub_branches(repo, branches=PUBLICATION_BRANCHES):
   for branch, commits in branches.items():
     _checkout_orphan_branch(repo, branch)
