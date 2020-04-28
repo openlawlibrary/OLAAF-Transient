@@ -20,17 +20,17 @@ OUTSIDE_TUF_AUTH_DIV_XPATH = "//div[@class='outside-tuf-authenticate']"
 # branches as keys | commits and changed files as values
 PUBLICATION_BRANCHES = {
     "publication/2020-01-01": {
-        "commit1": [
+        "2020-01-01/2019-01-01": [
             ("file1.html", True),  # file name, change auth-div or not
             ("file3.html", True)
         ],
-        "commit2": [
+        "2020-01-01/2019-02-02": [
             ("file2.html", True)
         ],
-        "commit3": [
+        "2020-01-01/2019-03-03": [
             ("index.html", True)
         ],
-        "commit4": [
+        "2020-01-01/2019-04-04": [
             ("file1.html", False)
         ]
     },
@@ -61,13 +61,18 @@ def publications():
   return PUBLICATION_BRANCHES
 
 
+@pytest.fixture
+def repo_files():
+  return [str(f.relative_to(DATA)) for f in ALL_FILES]
+
+
 def _init_pub_branches(repo, branches=PUBLICATION_BRANCHES):
   for branch, commits in branches.items():
     _checkout_orphan_branch(repo, branch)
     # copy initial files
     for f in ALL_FILES:
       _copy_to_repo(f)
-    repo.commit("Initial commit.")
+    repo.commit(branch)
 
     # commit
     for msg, file_changes in commits.items():
