@@ -39,6 +39,38 @@ PUBLICATION_BRANCHES = {
 }
 
 
+@pytest.fixture
+def repository():
+  try:
+    repo = GitRepository(str(REPOSITORY_PATH))
+    repo.init_repo()
+    _init_pub_branches(repo)
+    yield repo
+  except KeyboardInterrupt:
+    pass
+  except Exception:
+    raise
+  finally:
+    shutil.rmtree(REPOSITORY_PATH)
+    REPOSITORY_PATH.mkdir()
+    (REPOSITORY_PATH / ".gitkeep").touch()
+
+
+def _init_pub_branches(repo, branches=PUBLICATION_BRANCHES):
+  for branch, commits in branches.items():
+    _checkout_orphan_branch(repo, branch)
+    # copy initial files
+    for f in ALL_FILES:
+      _copy_to_repo(f)
+    repo.commit("Initial commit.")
+
+    # commit
+    for msg, file_changes in commits.items():
+      for f_name, is_auth_change in file_changes:
+        _change_file_content(REPOSITORY_PATH / f_name, is_auth_change)
+      repo.commit(msg)
+
+
 def _checkout_orphan_branch(repo, branch_name):
   """Creates orphan branch"""
   repo._git(f'checkout --orphan {branch_name}')
@@ -68,35 +100,3 @@ def _change_file_content(f, change_tuf_auth_div=True):
     el[0].text += random_str
 
   f.write_text(html.tostring(tree, encoding="utf-8", pretty_print=True).decode("utf-8"))
-
-
-def _init_pub_branches(repo, branches=PUBLICATION_BRANCHES):
-  for branch, commits in branches.items():
-    _checkout_orphan_branch(repo, branch)
-    # copy initial files
-    for f in ALL_FILES:
-      _copy_to_repo(f)
-    repo.commit("Initial commit.")
-
-    # commit
-    for msg, file_changes in commits.items():
-      for f_name, is_auth_change in file_changes:
-        _change_file_content(REPOSITORY_PATH / f_name, is_auth_change)
-      repo.commit(msg)
-
-
-@pytest.fixture
-def repository():
-  try:
-    repo = GitRepository(str(REPOSITORY_PATH))
-    repo.init_repo()
-    _init_pub_branches(repo)
-    yield repo
-  except KeyboardInterrupt:
-    pass
-  except Exception:
-    raise
-  finally:
-    shutil.rmtree(REPOSITORY_PATH)
-    REPOSITORY_PATH.mkdir()
-    (REPOSITORY_PATH / ".gitkeep").touch()
