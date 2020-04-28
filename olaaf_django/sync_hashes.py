@@ -51,7 +51,7 @@ def sync_hashes(repo_path):
   logger.info('Syncing hashes of repository %s', repo_path)
   repository, _ = Repository.objects.get_or_create(name=repo_name)
 
-  with webdriver.Chrome(chrome_options=chrome_options) as chrome_driver:
+  with webdriver.Chrome(options=chrome_options) as chrome_driver:
     # Call sync hashes for all publications
     for pub_branch in _find_all_publication_branches(repo):
       publication_commits = list(repo.iter_commits(pub_branch, reverse=True))
