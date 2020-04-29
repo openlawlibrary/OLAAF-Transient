@@ -35,4 +35,15 @@ def test_synchashes(repository, publications, repo_files, db):
     assert set(repo_files) == set([p.filesystem for p in paths])
     # TODO: Check url
 
-    hashes = reduce(concat, [list(p.hash_set.all()) for p in paths], [])
+    # hashes_db = reduce(concat, [list(p.hash_set.all()) for p in paths], [])
+
+    changed_files = reduce(concat, [publications[_to_pub_name(pub)][c] for c in commits], [])
+    changed_files_hashes_expected_len = {}
+    for f_name, is_auth_changed in changed_files:
+      changed_files_hashes_expected_len[f_name] = \
+          changed_files_hashes_expected_len.get(f_name, 1) + int(is_auth_changed) + 1
+
+    for f_name, expected_hashes_len in changed_files_hashes_expected_len.items():
+      file_hashes = Hash.objects.filter(path__filesystem=f_name, path__publication=pub)
+
+      assert len(file_hashes) == expected_hashes_len
