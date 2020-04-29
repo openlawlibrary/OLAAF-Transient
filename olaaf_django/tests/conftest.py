@@ -38,25 +38,60 @@ PUBLICATION_BRANCHES = {
         ]
     },
     "publication/2020-05-05": {
-        "publication/2020-05-05": [],  # empty commit
-        "2020-05-05/2019-01-01": [(f.name, False) for f in ALL_FILES],  # 4 files * (B|R) = 8 hashes
-        "2020-05-05/2019-02-02": [  # 1 file * (B|R) = 2 hashes
-            ("file2.html", True),
+        "publication/2020-05-05": [],
+        "2020-05-05/2019-01-01": [(f.name, False) for f in ALL_FILES],
+        "2020-05-05/2019-02-02": [
+            ("file1.html", True),
+            ("file3.html", True)
         ],
-        "2020-05-05/2019-03-03": [  # 1 file * (B|R) + 1 file * (B) = 3 hashes
-            ("file2.html", True),
-            ("file3.html", False)
-        ],
-        "2020-05-05/2019-04-04": [  # 2 files * (B|R) = 4 hashes
-            ("index.html", True),
+        "2020-05-05/2019-03-03": [
             ("file2.html", True)
         ],
-        "2020-05-05/2019-05-05": [  # 2 files * (B) = 2 hashes
-            ("file1.html", False),
-            ("index.html", False)
-        ]
+        "2020-05-05/2019-04-04": [
+            ("index.html", True)
+        ],
+        "2020-05-05/2019-05-05": [
+            ("file1.html", False)
+        ],
+        "2020-05-05/2019-06-06": [
+            ("file2.html", False)
+        ],
+        "2020-05-05/2019-07-07": [
+            ("index.html", True)
+        ],
     },
-    # "publication/2020-05-05-01": {},
+    "publication/2020-05-05-01": {  # publication/2020-05-05  will be skipped
+        "publication/2020-05-05-01": [],
+        "2020-05-05/2019-01-01": [(f.name, False) for f in ALL_FILES],
+        "2020-05-05/2019-02-02": [
+            ("file1.html", True),
+            ("file3.html", True)
+        ],
+        "2020-05-05/2019-03-03": [
+            ("file2.html", True)
+        ],
+        "2020-05-05/2019-04-04": [
+            ("index.html", True)
+        ],
+        "2020-05-05/2019-05-05": [
+            ("file1.html", False)
+        ],
+        "2020-05-05/2019-06-06": [
+            ("file2.html", False)
+        ],
+        "2020-05-05/2019-07-07": [
+            ("index.html", True)
+        ],
+        "2020-05-05/2019-08-08": [
+            ("index.html", True)
+        ],
+        "2020-05-05/2019-09-09": [
+            ("file2.html", True)
+        ],
+        "2020-05-05/2019-10-10": [
+            ("file3.html", True)
+        ],
+    },
 }
 
 
