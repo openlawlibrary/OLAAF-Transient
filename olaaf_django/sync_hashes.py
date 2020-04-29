@@ -1,10 +1,9 @@
+import logging
 import pathlib
 import re
 import sys
 import tempfile
 import uuid
-import logging
-
 from datetime import datetime
 from urllib.parse import urlparse
 
@@ -18,7 +17,6 @@ from selenium.webdriver.chrome.options import Options
 from olaaf_django.models import Commit, Hash, Path, Publication, Repository
 from olaaf_django.utils import (calc_hash, get_auth_div_content,
                                 get_html_document, is_iso_date, timed_run)
-
 
 logger = logging.getLogger(__name__)
 
@@ -125,7 +123,6 @@ def _sync_hashes_for_publication(repo, publication, publication_commits, chrome_
     date = commit_date if is_iso_date(commit_date) else None
     if date is None:
       continue
-
 
     current_commit, created = Commit.objects.get_or_create(
         publication=publication, sha=commit.hexsha, date=date)
@@ -292,7 +289,9 @@ def _insert_diff_hashes(publication, repo, prev_commit, current_commit, chrome_d
                                 'search_path': search_path})
     else:
       # If the file was modified or deleted, it is necessary to update its latest hash
-      hash_query = Q(path__filesystem=posix_path, end_commit__isnull=True)
+      hash_query = Q(path__publication=publication,
+                     path__filesystem=posix_path,
+                     end_commit__isnull=True)
       if not current_query_length:
         current_query = hash_query
         current_query_length = 1
@@ -360,7 +359,8 @@ def _add_and_update_paths_and_hashes(current_commit, hashes_queries, hashes_by_p
 
   logger.debug('Inserting or updating hashes. hashes_queries number: %s, added_files_paths '
                'number: %s', len(hashes_queries), len(added_files_paths))
-  logger.debug('hashes_by_paths_and_types size: %s KB', sys.getsizeof(hashes_by_paths_and_types) / 1024)
+  logger.debug('hashes_by_paths_and_types size: %s KB',
+               sys.getsizeof(hashes_by_paths_and_types) / 1024)
 
   if len(hashes_queries):
     # find all hashes which were modified or deleted
