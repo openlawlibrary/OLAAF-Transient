@@ -25,7 +25,7 @@ def test_synchashes(repository, publications, repo_files, db):
   assert set(pub_branches) == set([_to_pub_name(p) for p in pub_branches_db])
 
   for pub in pub_branches_db:
-    commits = list(publications[_to_pub_name(pub)].keys())
+    commits = list(publications[_to_pub_name(pub)].keys())[1:]
     commits_db = pub.commit_set.all()
 
     assert len(commits) == len(commits_db)
