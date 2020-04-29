@@ -14,23 +14,26 @@ ALL_FILES = list(DATA.rglob("*"))
 REPOSITORY_PATH = THIS_FOLDER / "repository"
 
 TUF_AUTH_DIV_XPATH = "//div[@class='tuf-authenticate']"
-OUTSIDE_TUF_AUTH_DIV_XPATH = "//div[@class='outside-tuf-authenticate']"
+OUTSIDE_TUF_AUTH_DIV_XPATH = "//div[@class='no-authenticate']"
 
 
 # branches as keys | commits and changed files as values
 PUBLICATION_BRANCHES = {
     "publication/2020-01-01": {
-        "2020-01-01/2019-01-01": [
-            ("file1.html", True),  # file name, change auth-div or not
+        "publication/2020-01-01": [],  # empty commit
+        "2020-01-01/2019-01-01": [(f.name, False) for f in ALL_FILES],  # 4 files * (B|R) = 8 hashes
+        "2020-01-01/2019-02-02": [  # 2 files * (B|R) = 4 hashes
+            # file name, auth div change
+            ("file1.html", True),
             ("file3.html", True)
         ],
-        "2020-01-01/2019-02-02": [
+        "2020-01-01/2019-03-03": [  # 1 file * (B|R) = 2 hashes
             ("file2.html", True)
         ],
-        "2020-01-01/2019-03-03": [
+        "2020-01-01/2019-04-04": [  # 1 file * (B|R) = 2 hashes
             ("index.html", True)
         ],
-        "2020-01-01/2019-04-04": [
+        "2020-01-01/2019-05-05": [  # 1 file * (B) = 1 hashes
             ("file1.html", False)
         ]
     },
@@ -69,16 +72,19 @@ def repo_files():
 def _init_pub_branches(repo, branches=PUBLICATION_BRANCHES):
   for branch, commits in branches.items():
     _checkout_orphan_branch(repo, branch)
-    # copy initial files
-    for f in ALL_FILES:
-      _copy_to_repo(f)
-    repo.commit(branch)
-
     # commit
     for msg, file_changes in commits.items():
-      for f_name, is_auth_change in file_changes:
-        _change_file_content(REPOSITORY_PATH / f_name, is_auth_change)
-      repo.commit(msg)
+      if len(file_changes):
+        for f_name, is_auth_change in file_changes:
+          src_path = DATA / f_name
+          dest_path = REPOSITORY_PATH / f_name
+          if not dest_path.exists():
+            _copy_to_repo(src_path)
+          _change_file_content(dest_path, is_auth_change)
+
+        repo.commit(msg)
+      else:
+        repo.commit_empty(msg)
 
 
 def _checkout_orphan_branch(repo, branch_name):
