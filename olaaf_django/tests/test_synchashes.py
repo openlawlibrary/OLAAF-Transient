@@ -35,8 +35,6 @@ def test_synchashes(repository, publications, repo_files, db):
     assert set(repo_files) == set([p.filesystem for p in paths])
     # TODO: Check url
 
-    # hashes_db = reduce(concat, [list(p.hash_set.all()) for p in paths], [])
-
     changed_files = reduce(concat, [publications[_to_pub_name(pub)][c] for c in commits], [])
     changed_files_hashes_expected_len = {}
     for f_name, is_auth_changed in changed_files:
