@@ -37,8 +37,26 @@ PUBLICATION_BRANCHES = {
             ("file1.html", False)
         ]
     },
-    # "publication/2020-01-01-01": {},
-    # "publication/2020-05-05": {},
+    "publication/2020-05-05": {
+        "publication/2020-05-05": [],  # empty commit
+        "2020-05-05/2019-01-01": [(f.name, False) for f in ALL_FILES],  # 4 files * (B|R) = 8 hashes
+        "2020-05-05/2019-02-02": [  # 1 file * (B|R) = 2 hashes
+            ("file2.html", True),
+        ],
+        "2020-05-05/2019-03-03": [  # 1 file * (B|R) + 1 file * (B) = 3 hashes
+            ("file2.html", True),
+            ("file3.html", False)
+        ],
+        "2020-05-05/2019-04-04": [  # 2 files * (B|R) = 4 hashes
+            ("index.html", True),
+            ("file2.html", True)
+        ],
+        "2020-05-05/2019-05-05": [  # 2 files * (B) = 2 hashes
+            ("file1.html", False),
+            ("index.html", False)
+        ]
+    },
+    # "publication/2020-05-05-01": {},
 }
 
 
