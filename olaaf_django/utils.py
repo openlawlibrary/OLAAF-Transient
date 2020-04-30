@@ -19,7 +19,7 @@ def calc_hash(content):
   <Returns>
     sha-256 hash of the input
   """
-  return hasher(content).hexdigest()
+  return hasher(content.strip()).hexdigest()
 
 
 def calc_file_hash(file_path):
