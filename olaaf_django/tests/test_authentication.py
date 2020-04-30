@@ -5,6 +5,7 @@ import pytest
 from django.test import Client
 from django.urls import reverse
 from git import Repo
+from lxml import html
 
 from olaaf_django import HOSTS_REPOS_CACHE
 from olaaf_django.authentication import check_authenticity
@@ -22,7 +23,17 @@ def _get_file_content(repo, url):
   commit = Commit.objects.get(publication__name=pub, date=date)
 
   # TODO: encode url component?
-  return repo.git.show('{}:{}'.format(commit.sha, path))
+  content = repo.git.show('{}:{}'.format(commit.sha, path))
+
+  # replace links inside html doc
+  tree = html.fromstring(content)
+  try:
+    link = tree.get_element_by_id("test-url")
+    link.attrib['href'] = f"/{'/'.join(parts[:4])}{link.attrib['href']}"
+  except KeyError:
+    pass
+
+  return html.tostring(tree, encoding="utf-8").decode("utf-8")
 
 
 def test_html_authentication(repository, publications, repo_files, db):
