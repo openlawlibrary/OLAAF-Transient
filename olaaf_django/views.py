@@ -27,7 +27,7 @@ def authenticate(request):
 
   try:
     repo_name, content_type = get_repo_info(request.get_host(), path)
-    publication = Publication.for_partner(repo_name).by_name_or_latest(pub_name)
+    publication = Publication.for_partner(repo_name).by_name_or_latest(pub_name, strict=True)
   except Publication.DoesNotExist:
     raise Http404()
 
