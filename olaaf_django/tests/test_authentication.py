@@ -1,7 +1,9 @@
 import itertools
+import random
 from functools import partial
 
 import pytest
+from django.db.models import Q, Subquery
 from django.test import Client
 from django.urls import reverse
 from git import Repo
@@ -11,20 +13,30 @@ from olaaf_django import HOSTS_REPOS_CACHE
 from olaaf_django.authentication import check_authenticity
 from olaaf_django.models import Commit, Publication
 from olaaf_django.sync_hashes import sync_hashes
+from olaaf_django.tests.conftest import _change_file_content
 
 
-def _get_file_content(repo, url):
+def _get_file_content(repo, url, change_auth_div=False):
   parts = url.split('/', 4)
 
   pub = parts[1]
   date = parts[3]
   path = parts[4]
 
-  commit = Commit.objects.get(publication__name=pub, date=date)
+  commit = Commit.objects.get(
+      publication__name=Subquery(
+          Publication.objects
+          .filter(name__startswith=pub)
+          .order_by('-name')
+          .values_list('name')[:1]
+      ),
+      date=date,
+  )
 
-  # TODO: encode url component?
   content = repo.git.show('{}:{}'.format(commit.sha, path))
 
+  if change_auth_div:
+    content = _change_file_content(content)
   # replace links inside html doc
   tree = html.fromstring(content)
   try:
@@ -57,9 +69,22 @@ def test_html_authentication(repository, publications, repo_files, db):
   client = Client()
   auth_post = partial(client.post, reverse('authenticate'))
   for url in test_urls:
-    response = auth_post(data={'url': url, 'content': _get_file_content(repo, url)})
+    change_auth_div = bool(random.getrandbits(1))
 
-    if url.startswith('_publication/2020-05-05'):  # this one is revoked and will return 404
+    response = auth_post(
+        data={
+            'url': url,
+            'content': _get_file_content(repo, url, change_auth_div=change_auth_div)
+        }
+    )
+
+    if url.startswith('_publication/2020-05-05/'):  # this one is revoked and will always return 404
       assert response.status_code == 404
     else:
       assert response.status_code == 200
+      msg = ' '.join([l.decode() for l in response.content.strip().splitlines()])
+
+      if change_auth_div:
+        assert msg.startswith('Not authentic')
+      else:
+        assert msg.startswith('Authentic')
