@@ -95,7 +95,7 @@ PUBLICATION_BRANCHES = {
 }
 
 
-@pytest.fixture
+@pytest.fixture(scope='session')
 def repository():
   try:
     repo = GitRepository(str(REPOSITORY_PATH))
@@ -133,7 +133,7 @@ def _init_pub_branches(repo, branches=PUBLICATION_BRANCHES):
           dest_path = REPOSITORY_PATH / f_name
           if not dest_path.exists():
             _copy_to_repo(src_path)
-          _change_file_content(dest_path, is_auth_change)
+          dest_path.write_text(_change_file_content(dest_path.read_text(), is_auth_change))
 
         repo.commit(msg)
       else:
@@ -153,13 +153,13 @@ def _copy_to_repo(src, dest_dir=REPOSITORY_PATH):
   (dest_dir / src.name).write_text(src.read_text())
 
 
-def _change_file_content(f, change_tuf_auth_div=True):
+def _change_file_content(content, change_tuf_auth_div=True):
   import random
   import string
 
   random_str = f" {''.join(random.sample(string.ascii_letters, 10))}"
 
-  tree = html.fromstring(f.read_text())
+  tree = html.fromstring(content)
   if change_tuf_auth_div:
     el = tree.xpath(TUF_AUTH_DIV_XPATH)
   else:
@@ -168,4 +168,4 @@ def _change_file_content(f, change_tuf_auth_div=True):
   if len(el):
     el[0].text += random_str
 
-  f.write_text(html.tostring(tree, encoding="utf-8", pretty_print=True).decode("utf-8"))
+  return html.tostring(tree, encoding="utf-8", pretty_print=True).decode("utf-8")
