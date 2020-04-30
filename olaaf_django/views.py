@@ -20,7 +20,7 @@ URL_RE = re.compile(
 def authenticate(request):
   url = request.POST.get('url')
 
-  if url.startswith('/_compare'):
+  if not url or url.startswith('/_compare'):
     return AuthenticationResponse(url, authenticable=False).to_http_response(request)
 
   pub_name, date, path = _extract_url(url)

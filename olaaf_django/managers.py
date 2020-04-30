@@ -40,9 +40,13 @@ class PublicationManager(models.Manager):
             )
         )
 
-      return queryset.order_by('-name').first()
+      publication = queryset.order_by('-name').first()
+      if publication:
+        return publication
+
+      raise self.model.DoesNotExist
     except (IndexError, TypeError):
-      raise Publication.DoesNotExist
+      raise self.model.DoesNotExist
 
   def non_revoked(self):
     return self.get_queryset().non_revoked()
