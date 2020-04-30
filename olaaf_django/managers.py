@@ -24,21 +24,33 @@ class PublicationManager(models.Manager):
       queryset = queryset.by_repo_name(self._repo_name)
     return queryset
 
-  def by_name_or_latest(self, name=None):
+  def by_name_or_latest(self, name=None, strict=False):
+    """Return latest partner publication or by name.
+    If `strict` is False, it will return the latest publication for a given name
+    e.g.
+      publications:
+        - name=2020-10-10,    date=2020-10-10
+        - name=2020-10-10-01, date=2020-10-10
+
+      returns 2020-10-10-01
+    """
     try:
       queryset = self.get_queryset().non_revoked().with_latest_field()
 
       if name:
-        queryset = (
-            queryset
-            .filter(
-                date=Subquery(
-                    queryset
-                    .filter(name=name)
-                    .values_list('date')[:1]
-                )
-            )
-        )
+        if strict:
+          queryset = queryset.filter(name=name)
+        else:
+          queryset = (
+              queryset
+              .filter(
+                  date=Subquery(
+                      queryset
+                      .filter(name=name)
+                      .values_list('date')[:1]
+                  )
+              )
+          )
 
       publication = queryset.order_by('-name').first()
       if publication:
