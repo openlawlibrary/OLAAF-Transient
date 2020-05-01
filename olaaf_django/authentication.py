@@ -5,9 +5,8 @@ from django.http import HttpResponse
 from django.template import loader
 from lxml import etree as et
 
-from .models import Hash, Publication
-from .utils import (calc_hash, get_auth_div_content, get_html_document,
-                    reset_local_urls)
+from .models import Hash, Path, Publication
+from .utils import calc_hash, get_auth_div_content, get_html_document, reset_local_urls
 
 HTML_CONTENT_TYPE = mimetypes.types_map.get('.html')
 PDF_CONTENT_TYPE = mimetypes.types_map.get('.pdf')
@@ -19,7 +18,7 @@ def check_authenticity(publication, pub_name, date, path, url, content, content_
       PDF_CONTENT_TYPE: _calculate_binary_content_hash
   }.get(content_type)
 
-  if hashing_func is None:
+  if hashing_func is None or not _is_authenticable(publication, path):
     return AuthenticationResponse(url, authenticable=False)
 
   if content_type == HTML_CONTENT_TYPE:
@@ -62,6 +61,10 @@ def check_authenticity(publication, pub_name, date, path, url, content, content_
     return AuthenticationResponse(url, authentic=True, from_date=start_commit_date, date=date)
   else:
     return AuthenticationResponse(url, authentic=False, date=date)
+
+
+def _is_authenticable(publication, path):
+  return Path.objects.filter(publication=publication, url=path).count() > 0
 
 
 def _calculate_binary_content_hash(binary_content):
