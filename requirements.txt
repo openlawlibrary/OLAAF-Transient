@@ -1,6 +1,8 @@
+click==6.7
 Django>=2.2
 GitPython>=2.1.11
-selenium>=3.141.0
 lxml>=4.3
-click==6.7
+pytest==5.4.1
+pytest-django==3.9.0
+selenium>=3.141.0
 taf>=0.3.1
