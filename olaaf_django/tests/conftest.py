@@ -23,7 +23,7 @@ PUBLICATION_BRANCHES = {
         "publication/2020-01-01": [],  # empty commit
         "2020-01-01/2019-01-01": [(f.name, False) for f in ALL_FILES],  # 4 files * (B|R) = 8 hashes
         "2020-01-01/2019-02-02": [  # 2 files * (B|R) = 4 hashes
-            # file name, auth div change
+            # file name, indicator if content of the authenticated div is modified
             ("file1.html", True),
             ("file3.html", True)
         ],
@@ -94,6 +94,13 @@ PUBLICATION_BRANCHES = {
     },
 }
 
+NON_PUBLICATION_BRANCHES = {
+    "publication/2020-01": {},
+    "publication/2020-01-01-01-01": {},
+    "publication/2020-01-01.2020-01-04": {},
+    "test": {},
+}
+
 
 @pytest.fixture(scope='session')
 def repository():
@@ -118,11 +125,17 @@ def publications():
 
 
 @pytest.fixture
+def non_publications():
+  return NON_PUBLICATION_BRANCHES
+
+
+@pytest.fixture
 def repo_files():
   return [str(f.relative_to(DATA)) for f in ALL_FILES]
 
 
 def _init_pub_branches(repo, branches=PUBLICATION_BRANCHES):
+  # create publication branches
   for branch, commits in branches.items():
     _checkout_orphan_branch(repo, branch)
     # commit
@@ -138,6 +151,11 @@ def _init_pub_branches(repo, branches=PUBLICATION_BRANCHES):
         repo.commit(msg)
       else:
         repo.commit_empty(msg)
+
+  # create non publication branches
+  for branch in NON_PUBLICATION_BRANCHES.keys():
+    _checkout_orphan_branch(repo, branch)
+    repo.commit_empty("Non publication branch")
 
 
 def _checkout_orphan_branch(repo, branch_name):
