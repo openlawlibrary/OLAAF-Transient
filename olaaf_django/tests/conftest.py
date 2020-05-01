@@ -146,7 +146,7 @@ def chrome_driver():
 def _init_pub_branches(repo, branches=PUBLICATION_BRANCHES):
   # create publication branches
   for branch, commits in branches.items():
-    _checkout_orphan_branch(repo, branch)
+    repo.checkout_orphan_branch(branch)
     # commit
     for msg, file_changes in commits.items():
       if len(file_changes):
@@ -163,17 +163,8 @@ def _init_pub_branches(repo, branches=PUBLICATION_BRANCHES):
 
   # create non publication branches
   for branch in NON_PUBLICATION_BRANCHES.keys():
-    _checkout_orphan_branch(repo, branch)
+    repo.checkout_orphan_branch(branch)
     repo.commit_empty("Non publication branch")
-
-
-def _checkout_orphan_branch(repo, branch_name):
-  """Creates orphan branch"""
-  repo._git(f'checkout --orphan {branch_name}')
-  try:
-    repo._git('rm -rf .')
-  except subprocess.CalledProcessError:  # If repository is empty
-    pass
 
 
 def _copy_to_repo(src, dest_dir=REPOSITORY_PATH):
