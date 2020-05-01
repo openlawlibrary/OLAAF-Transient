@@ -6,8 +6,8 @@ from django.template import loader
 from lxml import etree as et
 
 from .models import Hash, Publication
-from .utils import (calc_hash, get_auth_div_content, get_html_document, reset_local_urls,
-                    strip_binary_content)
+from .utils import (calc_hash, get_auth_div_content, get_html_document,
+                    reset_local_urls)
 
 HTML_CONTENT_TYPE = mimetypes.types_map.get('.html')
 PDF_CONTENT_TYPE = mimetypes.types_map.get('.pdf')
@@ -65,7 +65,6 @@ def check_authenticity(publication, pub_name, date, path, url, content, content_
 
 
 def _calculate_binary_content_hash(binary_content):
-  binary_content = strip_binary_content(binary_content)
   return calc_hash(binary_content)
 
 
