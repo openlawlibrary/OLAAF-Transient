@@ -10,7 +10,7 @@ from urllib.parse import urlparse
 from django.db import transaction
 from django.db.models import Q
 from git import Repo
-from lxml import etree as et
+from lxml import html as et_html
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 
@@ -425,7 +425,7 @@ def _calculate_file_hashes(file_content, doc):
     # this is an html file, calculate its rendered hash
     auth_div = get_auth_div_content(doc)
     if auth_div is not None:
-      rendered_hash_value = calc_hash(et.tostring(auth_div))
+      rendered_hash_value = calc_hash(et_html.tostring(auth_div))
       rendered_hash = Hash(value=rendered_hash_value, hash_type=Hash.RENDERED)
 
   return bitstream_hash, rendered_hash

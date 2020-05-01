@@ -4,7 +4,7 @@ import html
 import time
 from functools import wraps
 
-from lxml import etree as et
+from lxml import html as et_html
 
 hasher = hashlib.sha256
 
@@ -19,7 +19,7 @@ def calc_hash(content):
   <Returns>
     sha-256 hash of the input
   """
-  return hasher(content.strip()).hexdigest()
+  return hasher(strip_content(content)).hexdigest()
 
 
 def calc_file_hash(file_path):
@@ -48,7 +48,7 @@ def get_html_document(page_source):
   """
   # unescape page source
   page_source = html.unescape(page_source)
-  return et.fromstring(page_source, et.HTMLParser())
+  return et_html.fromstring(page_source)
 
 
 def get_auth_div_content(doc):
@@ -67,7 +67,7 @@ def get_auth_div_content(doc):
   return None
 
 
-def strip_binary_content(content):
+def strip_content(content):
   """
   <Purpose>
     Git show removes an empty line at the end of files, meaning that hash inserted into the database
@@ -75,12 +75,17 @@ def strip_binary_content(content):
     So, it is necessary to remove it from the provided binary content before calculating its hash.
     surrogateescape is an error handler used to cope with encoding problems.
   <Arguments>
-    contents:
-       binary string from which leading and trailing whitespaces should be stripped
+    content:
+      binary string or string from which leading and trailing whitespaces should be stripped
   <Returns>
     Stripped content
   """
-  return content.decode('utf-8', 'surrogateescape').strip().encode('utf-8', 'surrogateescape')
+  if isinstance(content, bytes):
+    return content.decode('utf-8', 'surrogateescape').strip().encode('utf-8', 'surrogateescape')
+  elif isinstance(content, str):
+    return content.strip()
+  else:
+    raise TypeError("Incorrect content type.")
 
 
 def is_iso_date(date):

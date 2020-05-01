@@ -4,7 +4,10 @@ from pathlib import Path
 
 import pytest
 from lxml import html
+from selenium import webdriver
 from taf.git import GitRepository
+
+from olaaf_django.sync_hashes import chrome_options
 
 THIS_FOLDER = Path(__file__).parent
 
@@ -132,6 +135,12 @@ def non_publications():
 @pytest.fixture
 def repo_files():
   return [str(f.relative_to(DATA)) for f in ALL_FILES]
+
+
+@pytest.fixture(scope='session')
+def chrome_driver():
+  with webdriver.Chrome(options=chrome_options) as driver:
+    yield driver
 
 
 def _init_pub_branches(repo, branches=PUBLICATION_BRANCHES):
