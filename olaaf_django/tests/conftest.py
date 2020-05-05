@@ -1,4 +1,6 @@
+import os
 import shutil
+import stat
 import subprocess
 from pathlib import Path
 
@@ -117,7 +119,7 @@ def repository():
   except Exception:
     raise
   finally:
-    shutil.rmtree(REPOSITORY_PATH)
+    shutil.rmtree(REPOSITORY_PATH, onerror=_onerror)
     REPOSITORY_PATH.mkdir()
     (REPOSITORY_PATH / ".gitkeep").touch()
 
@@ -187,3 +189,11 @@ def _change_file_content(content, change_tuf_auth_div=True):
     el[0].text += random_str
 
   return html.tostring(tree, encoding="utf-8", pretty_print=True).decode("utf-8")
+
+
+def _onerror(_func, path, _exc_info):
+  """Used by when calling rmtree to ensure that readonly files and folders
+  are deleted.
+  """
+  os.chmod(path, stat.S_IWRITE)
+  os.unlink(path)
