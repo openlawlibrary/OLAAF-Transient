@@ -43,8 +43,12 @@ def sync_hashes(library_root, repos_data):
   date.
   """
   library_root = pathlib.Path(library_root)
-  if pathlib.Path(repos_data).is_file():
-    repos_data = pathlib.Path(repos_data).read_text()
+
+  try:
+    if pathlib.Path(repos_data).is_file():
+      repos_data = pathlib.Path(repos_data).read_text()
+  except Exception:
+    pass
 
   try:
     repos_data = json.loads(repos_data)
@@ -65,7 +69,7 @@ def sync_hashes(library_root, repos_data):
         if _check_if_valid_publication_branch_name(branch):
           publication_name = branch.rsplit('/', 1)[1]
         else:
-          publication_name = "default"
+          publication_name = branch
 
         try:
           publication = Publication.objects.get(repository=repository,
@@ -73,8 +77,8 @@ def sync_hashes(library_root, repos_data):
         except Exception:
           date = commits_data[0]["additional-info"]["build-date"]
           publication = Publication.objects.create(repository=repository,
-                                                      name=publication_name,
-                                                      date=date)
+                                                   name=publication_name,
+                                                   date=date)
 
         _sync_hashes_for_publication(repo, publication, commits_data, chrome_driver)
 
