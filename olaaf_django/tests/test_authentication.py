@@ -48,12 +48,11 @@ def _get_file_content(chrome_driver, repo, url, change_auth_div=False):
   return html.tostring(document, encoding="utf-8").decode("utf-8")
 
 
-def test_html_authentication(repository, publications, repo_files, chrome_driver, db):
-  repo = Repo(repository.path)
+def test_html_authentication(html_repository_and_input, publications, repo_files, chrome_driver, db):
+  html_repository, html_repo_input = html_repository_and_input
+  repo = Repo(html_repository.path)
 
-  sync_hashes(repository.path)
-  # update revoked publication
-  Publication.objects.filter(name="2020-01-01").update(revoked=False)
+  sync_hashes(html_repository.root_dir, html_repo_input)
 
   # list of urls like '_publication/2020-01-01/_date/2019-01-01/index.html'
   test_urls = list([
@@ -64,7 +63,7 @@ def test_html_authentication(repository, publications, repo_files, chrome_driver
       )])
 
   # Add test host
-  HOSTS_REPOS_CACHE['testserver'] = 'tests/repository'
+  HOSTS_REPOS_CACHE['testserver'] = 'test/html-repo'
 
   client = Client()
   auth_post = partial(client.post, reverse('authenticate'))

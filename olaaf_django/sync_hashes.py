@@ -128,6 +128,8 @@ def _sync_hashes_for_publication(repo, publication, commits_data, chrome_driver)
       logger.error("Could not insert commit %s. Date not specified", commit)
       return
 
+    logger.info('Current commit: %s', commit)
+
     current_commit, created = Commit.objects.get_or_create(
         publication=publication, sha=commit, date=date)
     if created:
