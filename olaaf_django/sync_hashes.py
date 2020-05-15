@@ -43,18 +43,7 @@ def sync_hashes(library_root, repos_data):
   date.
   """
   library_root = pathlib.Path(library_root)
-
-  try:
-    if pathlib.Path(repos_data).is_file():
-      repos_data = pathlib.Path(repos_data).read_text()
-  except Exception:
-    pass
-
-  try:
-    repos_data = json.loads(repos_data)
-  except json.decoder.JSONDecodeError:
-    logger.error("Invalid json input")
-    return
+  repos_data = _load_json_input(repos_data)
 
   for repo_name, repo_data in repos_data.items():
     repo_path = library_root / repo_name
@@ -85,6 +74,21 @@ def sync_hashes(library_root, repos_data):
         # Mark publications on the same date as revoked
         _revoke_same_date_publications(publication)
 
+
+def _load_json_input(repos_data):
+  try:
+    if pathlib.Path(repos_data).is_file():
+        repos_data = pathlib.Path(repos_data).read_text()
+  except Exception:
+    pass
+
+  try:
+    repos_data = json.loads(repos_data)
+  except json.decoder.JSONDecodeError:
+    logger.error("Invalid json input")
+    raise ValueError("Invalid json input")
+
+  return repos_data
 
 def _revoke_same_date_publications(publication):
   def _get_same_date_publication():
@@ -126,7 +130,7 @@ def _sync_hashes_for_publication(repo, publication, commits_data, chrome_driver)
       date = commit_info["build-date"]
     else:
       logger.error("Could not insert commit %s. Date not specified", commit)
-      return
+      raise ValueError(f"Could not insert commit {commit}. Date not specified")
 
     logger.info('Current commit: %s', commit)
 
