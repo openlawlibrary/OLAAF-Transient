@@ -90,7 +90,7 @@ def _revoke_same_date_publications(publication):
   def _get_same_date_publication():
     for pub in (
         Publication.objects
-        .filter(date=publication.date, revoked=False)
+        .filter(repository=publication.repository, date=publication.date, revoked=False)
         .order_by('-name')[1:]
     ):
       logger.info('Marking publication %s as revoked', pub.name)
