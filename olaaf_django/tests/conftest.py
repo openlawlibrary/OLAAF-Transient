@@ -1,13 +1,14 @@
 import os
+import json
 import shutil
 import stat
-import subprocess
 from pathlib import Path
+from collections import defaultdict
 
 import pytest
 from lxml import html
 from selenium import webdriver
-from taf.git import GitRepository
+from taf.git import NamedGitRepository
 
 from olaaf_django.sync_hashes import chrome_options
 
@@ -16,7 +17,9 @@ THIS_FOLDER = Path(__file__).parent
 DATA = THIS_FOLDER / "data"
 ALL_FILES = list(DATA.rglob("*"))
 
-REPOSITORY_PATH = THIS_FOLDER / "repository"
+LIBRARY_ROOT = THIS_FOLDER / "library"
+HTML_REPO_NAME = "test/html-repo"
+HTML_REPOSITORY_PATH = LIBRARY_ROOT / HTML_REPO_NAME
 
 TUF_AUTH_DIV_XPATH = "//div[@class='tuf-authenticate']"
 OUTSIDE_TUF_AUTH_DIV_XPATH = "//div[@class='no-authenticate']"
@@ -108,20 +111,20 @@ NON_PUBLICATION_BRANCHES = {
 
 
 @pytest.fixture(scope='session')
-def repository():
+def html_repository_and_input():
   try:
-    repo = GitRepository(str(REPOSITORY_PATH))
+    repo = NamedGitRepository(LIBRARY_ROOT, HTML_REPO_NAME)
     repo.init_repo()
-    _init_pub_branches(repo)
-    yield repo
+    repos_data = _init_pub_branches(repo)
+    yield repo, repos_data
   except KeyboardInterrupt:
     pass
   except Exception:
     raise
   finally:
-    shutil.rmtree(REPOSITORY_PATH, onerror=_onerror)
-    REPOSITORY_PATH.mkdir()
-    (REPOSITORY_PATH / ".gitkeep").touch()
+    shutil.rmtree(HTML_REPOSITORY_PATH, onerror=_onerror)
+    HTML_REPOSITORY_PATH.mkdir()
+    (HTML_REPOSITORY_PATH / ".gitkeep").touch()
 
 
 @pytest.fixture
@@ -146,7 +149,8 @@ def chrome_driver():
 
 
 def _init_pub_branches(repo, branches=PUBLICATION_BRANCHES):
-  # create publication branches
+  # create publication branches and synchashes input json
+  repos_data = {repo.name: defaultdict(list)}
   for branch, commits in branches.items():
     repo.checkout_orphan_branch(branch)
     # commit
@@ -154,22 +158,38 @@ def _init_pub_branches(repo, branches=PUBLICATION_BRANCHES):
       if len(file_changes):
         for f_name, is_auth_change in file_changes:
           src_path = DATA / f_name
-          dest_path = REPOSITORY_PATH / f_name
+          dest_path = HTML_REPOSITORY_PATH / f_name
           if not dest_path.exists():
             _copy_to_repo(src_path)
           dest_path.write_text(_change_file_content(dest_path.read_text(), is_auth_change))
 
-        repo.commit(msg)
+        sha = repo.commit(msg)
       else:
-        repo.commit_empty(msg)
+        sha = repo.commit_empty(msg)
+
+      build_date, codified_date = msg.split('/')
+      if build_date == 'publication':
+        continue
+      additional_info = {"build-date": build_date}
+      if codified_date is not None:
+        additional_info["codified-date"] = codified_date
+
+      repos_data[repo.name][branch].append(
+        {
+          "commit": sha,
+          "additional-info": additional_info
+        }
+      )
 
   # create non publication branches
   for branch in NON_PUBLICATION_BRANCHES.keys():
     repo.checkout_orphan_branch(branch)
     repo.commit_empty("Non publication branch")
 
+  return json.dumps(repos_data)
 
-def _copy_to_repo(src, dest_dir=REPOSITORY_PATH):
+
+def _copy_to_repo(src, dest_dir=HTML_REPOSITORY_PATH):
   (dest_dir / src.name).write_text(src.read_text())
 
 

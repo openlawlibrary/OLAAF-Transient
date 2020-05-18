@@ -1,3 +1,4 @@
+import json
 import logging
 import pathlib
 import re
@@ -32,7 +33,7 @@ MAX_HASHES_LIST_SIZE_IN_BYTES = 100 * 1024  # 100mb
 
 
 @timed_run()
-def sync_hashes(repo_path):
+def sync_hashes(library_root, repos_data):
   """
   Given a path of an html repository, gets the publication branches and
   traverse through all its commits which have not yet been inserted into the
@@ -41,34 +42,65 @@ def sync_hashes(repo_path):
   calculated hashes of modified and deleted files and set their valid until
   date.
   """
+  library_root = pathlib.Path(library_root)
+  repos_data = _load_json_input(repos_data)
 
-  repo_path = pathlib.Path(repo_path)
-  repo_name = '{}/{}'.format(repo_path.parent.name, repo_path.name)
-  repo = Repo(str(repo_path))
+  for repo_name, repo_data in repos_data.items():
+    repo_path = library_root / repo_name
+    if not repo_path.exists():
+      logger.warning('\n\n\nSkipping repository: "%s". Path "%s" does not exist!',
+                     repo_name, repo_path)
+      continue
 
-  logger.info('Syncing hashes of repository %s', repo_path)
-  repository, _ = Repository.objects.get_or_create(name=repo_name)
+    repo = Repo(str(repo_path))
 
-  with webdriver.Chrome(options=chrome_options) as chrome_driver:
-    # Call sync hashes for all publications
-    for pub_branch in _find_all_publication_branches(repo):
-      publication_commits = list(repo.iter_commits(pub_branch, reverse=True))
-      commit_date = publication_commits[0].committed_datetime.date()
-      publication_name = pub_branch.rsplit('/', 1)[1]
-      publication, _ = Publication.objects.get_or_create(repository=repository,
-                                                         name=publication_name,
-                                                         date=commit_date)
-      _sync_hashes_for_publication(repo, publication, publication_commits, chrome_driver)
+    logger.info('\n\n\nSyncing hashes of repository: %s', repo_name)
+    repository, _ = Repository.objects.get_or_create(name=repo_name)
 
-      # Mark publications on the same date as revoked
-      _revoke_same_date_publications(publication)
+    with webdriver.Chrome(options=chrome_options) as chrome_driver:
+      # Call sync hashes for all publications
+      for branch, commits_data in repo_data.items():
+        if _check_if_valid_publication_branch_name(branch):
+          publication_name = branch.rsplit('/', 1)[1]
+        else:
+          publication_name = branch
+
+        try:
+          publication = Publication.objects.get(repository=repository,
+                                                name=publication_name)
+        except Exception:
+          date = commits_data[0]["additional-info"]["build-date"]
+          publication = Publication.objects.create(repository=repository,
+                                                   name=publication_name,
+                                                   date=date)
+
+        _sync_hashes_for_publication(repo, publication, commits_data, chrome_driver)
+
+        # Mark publications on the same date as revoked
+        _revoke_same_date_publications(publication)
+
+
+def _load_json_input(repos_data):
+  try:
+    if pathlib.Path(repos_data).is_file():
+      repos_data = pathlib.Path(repos_data).read_text()
+  except Exception:
+    pass
+
+  try:
+    repos_data = json.loads(repos_data)
+  except json.decoder.JSONDecodeError:
+    logger.error("Invalid json input")
+    raise ValueError("Invalid json input")
+
+  return repos_data
 
 
 def _revoke_same_date_publications(publication):
   def _get_same_date_publication():
     for pub in (
         Publication.objects
-        .filter(date=publication.date, revoked=False)
+        .filter(repository=publication.repository, date=publication.date, revoked=False)
         .order_by('-name')[1:]
     ):
       logger.info('Marking publication %s as revoked', pub.name)
@@ -79,59 +111,43 @@ def _revoke_same_date_publications(publication):
 
 
 @timed_run()
-def _sync_hashes_for_publication(repo, publication, publication_commits, chrome_driver):
+def _sync_hashes_for_publication(repo, publication, commits_data, chrome_driver):
   # check if commits are already in the database
   # if they are, see if there are commits which have not been inserted yet
   # if not, insert the hashes from the beginning
-  logger.info('Syncing hashes of publication %s', publication.name)
-  print(f'\nSyncing hashes of publication {publication.name}\n')
-  inserted_commits = Commit.objects.filter(publication=publication)[::1]
-  if len(inserted_commits) == len(publication_commits):
-    logger.info('All commits of publication %s have been loaded into the database',
-                publication.name)
-    print('All commits have been loaded into the database')
-    return
+  logger.info('\nPublication: %s\n', publication.name)
 
-  # find the last inserted commit
-  inserted_commits_num = len(inserted_commits)
-  if inserted_commits_num == 0:
+  prev_commit = Commit.objects.filter(publication=publication, revoked=False).last()
+  if prev_commit is None:
     prev_commit = Commit(sha=EMPTY_TREE_SHA)
-  else:
-    prev_commit = inserted_commits[-1]
 
-  logger.debug('Last inserted commit of publication %s: %s', publication.name, prev_commit)
-
-  for commit in publication_commits[inserted_commits_num + 1::]:
-    # TODO
-    # We should not use commit date here since it has not been authenticated
-    # The date could be a part of the information passed to sync_hashes, see issue #2
-    # Since this is going to be changed soon, not making an effort to check if that date
-    # already exists. We have not yet implemented anything that would be affected by the
-    # missing counter
-    logger.info('Current commit: %s', commit.hexsha)
-    commit_msg = commit.message.strip()
-    # skip emtpy publication initialization commit
-    # this will be after above mentioned refactoring
-    if commit_msg.startswith('publication'):
-      logger.debug('Skipping commit %s as it is empty', commit.hexsha)
+  for commit_data in commits_data:
+    commit = commit_data["commit"]
+    # if this is not a new publication, the first branch commit passed to synchashes is expected
+    # to be the last successfully inserted commit
+    if prev_commit is None:
+      prev_commit = commit
       continue
-    split_commit_msg = commit_msg.split('/')
-    if len(split_commit_msg) == 1:
-      commit_date = commit_msg
+    commit_info = commit_data.get("additional-info")
+    if "codified-date" in commit_info:
+      date = commit_info["codified-date"]
+    elif "build-date" in commit_info:
+      date = commit_info["build-date"]
     else:
-      commit_date = split_commit_msg[1]
-    date = commit_date if is_iso_date(commit_date) else None
-    if date is None:
-      continue
+      logger.error("Could not insert commit %s. Date not specified", commit)
+      raise ValueError(f"Could not insert commit {commit}. Date not specified")
+
+    logger.debug('Current commit: %s', commit)
 
     current_commit, created = Commit.objects.get_or_create(
-        publication=publication, sha=commit.hexsha, date=date)
+        publication=publication, sha=commit, date=date)
     if created:
-      logger.debug('Inserting commit sha=%s, date=%s into publication %s', commit.hexsha, date,
+      logger.debug('Inserting commit sha=%s, date=%s into publication %s', commit, date,
                    publication.name)
       current_commit.save()
     else:
-      logger.debug('Commit %s already inserted', commit.hexsha)
+      logger.info('Commit %s already inserted', commit)
+      continue
 
     try:
       _insert_diff_hashes(publication, repo, prev_commit, current_commit, chrome_driver)
@@ -139,10 +155,10 @@ def _sync_hashes_for_publication(repo, publication, publication_commits, chrome_
       # Deletes commit and its hashes, but keeps paths
       logger.error('And error occurred while inserting hashes of commit %s: %s',
                    current_commit, str(e))
-      logger.info('Deleting commit %s', current_commit)
+      logger.debug('Deleting commit %s', current_commit)
       try:
         current_commit.delete()
-        logger.info('Successfully deleted commit %s', current_commit)
+        logger.debug('Successfully deleted commit %s', current_commit)
       except Exception as e:
         logger.error('And error occurred while deleting commit %s', current_commit)
         raise
@@ -174,10 +190,10 @@ def _find_all_publication_branches(repo):
   # skip a same date publications with the lower index
   for idx, b in enumerate(branches):
     try:
-      branch_wihtout_index = b[:22]
-      if branch_wihtout_index in branches[idx+1]:
+      branch_without_index = b[:22]
+      if branch_without_index in branches[idx+1]:
         logger.debug('Skipping publication branch %s as it was built on the same day '
-                     'as another branch with higher index', branch_wihtout_index)
+                     'as another branch with higher index', branch_without_index)
         continue
     except IndexError:
       pass
@@ -224,10 +240,8 @@ def _insert_diff_hashes(publication, repo, prev_commit, current_commit, chrome_d
     current_commit:
       The current commit
   """
-  logger.info('Inserting hashes. Commit: %s, previous commit %s', current_commit, prev_commit)
-
-  print('Inserting diff hashes. Previous commit {} current commit {}'.format(prev_commit,
-                                                                             current_commit))
+  logger.debug('Inserting diff hashes. Previous commit {} current commit {}'
+               .format(prev_commit, current_commit))
 
   # keep track of paths of new files
   # these path have to be inserted into the database
@@ -281,7 +295,7 @@ def _insert_diff_hashes(publication, repo, prev_commit, current_commit, chrome_d
         search_path = doc.xpath('.//@data-search-path')[-1] if doc is not None else None
       except IndexError:
         doc_title = doc.xpath('//title/text()')
-        print(f'Document with title {doc_title} does not contain data-search-path!\n')
+        logger.debug('Document with title %s does not contain data-search-path!\n', doc_title)
 
         search_path = None
 

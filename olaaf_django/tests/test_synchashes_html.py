@@ -7,7 +7,7 @@ from lxml import html
 
 from olaaf_django.models import Hash, Publication
 from olaaf_django.sync_hashes import sync_hashes
-from olaaf_django.tests.conftest import REPOSITORY_PATH
+from olaaf_django.tests.conftest import HTML_REPOSITORY_PATH
 
 
 def _to_pub_branch_name(pub):
@@ -20,7 +20,7 @@ def _to_commit_name(pub, commit):
 
 
 def _check_path_url(path):
-  tree = html.fromstring((REPOSITORY_PATH / path.filesystem).read_bytes())
+  tree = html.fromstring((HTML_REPOSITORY_PATH / path.filesystem).read_bytes())
   expected_url_el = tree.xpath(".//meta[contains(@property, 'expected:url')]")
   try:
     expected_url = expected_url_el[0].attrib.get("content")
@@ -29,26 +29,24 @@ def _check_path_url(path):
     pytest.fail("Add '<meta property=\"expected:url\" content=\"...\" />' to test html file!")
 
 
-def test_synchashes(repository, non_publications, publications, repo_files, db):
-  sync_hashes(repository.path)
+def test_synchashes(html_repository_and_input, non_publications, publications, repo_files, db):
+  html_repository, html_repo_input = html_repository_and_input
+  sync_hashes(html_repository.root_dir, html_repo_input)
 
   pub_branches = list(publications.keys())
-  # this one is skipped in favor of publication/2020-05-05-01
-  pub_branches.remove("publication/2020-05-05")
 
   pub_branches_db = Publication.objects.all()
   assert set(pub_branches) == set([_to_pub_branch_name(p) for p in pub_branches_db])
 
   # check publications
-  assert Publication.objects.get(name="2020-01-01").revoked
-  with pytest.raises(Publication.DoesNotExist):
-    Publication.objects.get(name="2020-05-05")
+  assert not Publication.objects.get(name="2020-01-01").revoked
+  assert Publication.objects.get(name="2020-05-05").revoked
   assert not Publication.objects.get(name="2020-05-05-01").revoked
   # checks if there are just publication branches
   assert Publication.objects.all().count() == len(pub_branches)
 
   for pub in pub_branches_db:
-    repository.checkout_branch(f"publication/{pub.name}")
+    html_repository.checkout_branch(f"publication/{pub.name}")
 
     commits = list(publications[_to_pub_branch_name(pub)].keys())[1:]
     commits_db = pub.commit_set.all()
