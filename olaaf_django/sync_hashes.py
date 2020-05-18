@@ -1,5 +1,5 @@
-import logging
 import json
+import logging
 import pathlib
 import re
 import sys
@@ -47,9 +47,14 @@ def sync_hashes(library_root, repos_data):
 
   for repo_name, repo_data in repos_data.items():
     repo_path = library_root / repo_name
+    if not repo_path.exists():
+      logger.warning('\n\n\nSkipping repository: "%s". Path "%s" does not exist!',
+                     repo_name, repo_path)
+      continue
+
     repo = Repo(str(repo_path))
 
-    logger.info('Syncing hashes of repository %s', repo_path)
+    logger.info('\n\n\nSyncing hashes of repository: %s', repo_name)
     repository, _ = Repository.objects.get_or_create(name=repo_name)
 
     with webdriver.Chrome(options=chrome_options) as chrome_driver:
@@ -78,7 +83,7 @@ def sync_hashes(library_root, repos_data):
 def _load_json_input(repos_data):
   try:
     if pathlib.Path(repos_data).is_file():
-        repos_data = pathlib.Path(repos_data).read_text()
+      repos_data = pathlib.Path(repos_data).read_text()
   except Exception:
     pass
 
@@ -89,6 +94,7 @@ def _load_json_input(repos_data):
     raise ValueError("Invalid json input")
 
   return repos_data
+
 
 def _revoke_same_date_publications(publication):
   def _get_same_date_publication():
@@ -109,8 +115,7 @@ def _sync_hashes_for_publication(repo, publication, commits_data, chrome_driver)
   # check if commits are already in the database
   # if they are, see if there are commits which have not been inserted yet
   # if not, insert the hashes from the beginning
-  logger.info('Syncing hashes of publication %s', publication.name)
-  print(f'\nSyncing hashes of publication {publication.name}\n')
+  logger.info('\nPublication: %s\n', publication.name)
 
   prev_commit = Commit.objects.filter(publication=publication, revoked=False).last()
   if prev_commit is None:
@@ -132,13 +137,13 @@ def _sync_hashes_for_publication(repo, publication, commits_data, chrome_driver)
       logger.error("Could not insert commit %s. Date not specified", commit)
       raise ValueError(f"Could not insert commit {commit}. Date not specified")
 
-    logger.info('Current commit: %s', commit)
+    logger.debug('Current commit: %s', commit)
 
     current_commit, created = Commit.objects.get_or_create(
         publication=publication, sha=commit, date=date)
     if created:
-      logger.info('Inserting commit sha=%s, date=%s into publication %s', commit, date,
-                  publication.name)
+      logger.debug('Inserting commit sha=%s, date=%s into publication %s', commit, date,
+                   publication.name)
       current_commit.save()
     else:
       logger.info('Commit %s already inserted', commit)
@@ -150,10 +155,10 @@ def _sync_hashes_for_publication(repo, publication, commits_data, chrome_driver)
       # Deletes commit and its hashes, but keeps paths
       logger.error('And error occurred while inserting hashes of commit %s: %s',
                    current_commit, str(e))
-      logger.info('Deleting commit %s', current_commit)
+      logger.debug('Deleting commit %s', current_commit)
       try:
         current_commit.delete()
-        logger.info('Successfully deleted commit %s', current_commit)
+        logger.debug('Successfully deleted commit %s', current_commit)
       except Exception as e:
         logger.error('And error occurred while deleting commit %s', current_commit)
         raise
@@ -185,10 +190,10 @@ def _find_all_publication_branches(repo):
   # skip a same date publications with the lower index
   for idx, b in enumerate(branches):
     try:
-      branch_wihtout_index = b[:22]
-      if branch_wihtout_index in branches[idx+1]:
+      branch_without_index = b[:22]
+      if branch_without_index in branches[idx+1]:
         logger.debug('Skipping publication branch %s as it was built on the same day '
-                     'as another branch with higher index', branch_wihtout_index)
+                     'as another branch with higher index', branch_without_index)
         continue
     except IndexError:
       pass
@@ -235,10 +240,8 @@ def _insert_diff_hashes(publication, repo, prev_commit, current_commit, chrome_d
     current_commit:
       The current commit
   """
-  logger.info('Inserting hashes. Commit: %s, previous commit %s', current_commit, prev_commit)
-
-  print('Inserting diff hashes. Previous commit {} current commit {}'.format(prev_commit,
-                                                                             current_commit))
+  logger.debug('Inserting diff hashes. Previous commit {} current commit {}'
+               .format(prev_commit, current_commit))
 
   # keep track of paths of new files
   # these path have to be inserted into the database
@@ -292,7 +295,7 @@ def _insert_diff_hashes(publication, repo, prev_commit, current_commit, chrome_d
         search_path = doc.xpath('.//@data-search-path')[-1] if doc is not None else None
       except IndexError:
         doc_title = doc.xpath('//title/text()')
-        print(f'Document with title {doc_title} does not contain data-search-path!\n')
+        logger.debug('Document with title %s does not contain data-search-path!\n', doc_title)
 
         search_path = None
 

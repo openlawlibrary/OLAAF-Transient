@@ -1,9 +1,11 @@
 from django.core.management.base import BaseCommand
+
 from olaaf_django.sync_hashes import sync_hashes
+
 
 class Command(BaseCommand):
   help = """Traverse through all commits that have not yet been loaded into the database
-and calcule and insert/update hashes of added, modified and deleted files"""
+and calculate and insert/update hashes of added, modified and deleted files"""
 
   def add_arguments(self, parser):
     parser.add_argument("library_root", type=str, help="Path to the library root")
