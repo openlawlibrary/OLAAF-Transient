@@ -335,6 +335,7 @@ def _insert_diff_hashes(publication, repo, prev_commit, current_commit, chrome_d
                                        added_files_paths)
       # reset variables
       current_query = None
+      current_query_length = 0
       hashes_queries.clear()
       hashes_by_paths_and_types.clear()
       added_files_paths.clear()
