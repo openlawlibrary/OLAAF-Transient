@@ -70,9 +70,14 @@ def sync_hashes(library_root, repos_data):
                                                 name=publication_name)
         except Exception:
           date = commits_data[0]["additional-info"]["build-date"]
-          publication = Publication.objects.create(repository=repository,
-                                                   name=publication_name,
-                                                   date=date)
+          try:
+            publication = Publication.objects.create(repository=repository,
+                                                    name=publication_name,
+                                                    date=date)
+          except Exception as e:
+            logger.error('Could not create publication %s due to error:\n%s',
+                         publication_name, str(e))
+            raise
 
         _sync_hashes_for_publication(repo, publication, commits_data, chrome_driver)
 
