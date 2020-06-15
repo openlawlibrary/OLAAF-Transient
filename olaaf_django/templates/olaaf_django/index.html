@@ -48,10 +48,67 @@
               Please upload or drag-n-drop files you want to authenticate.
               <b>Html</b> and <b>pdf</b> file are supported.
             </p>
-            <input type="file" id="auth-file" multiple accept=".html,.pdf" />
+            <input
+              type="file"
+              id="auth-file"
+              multiple
+              accept=".html,.pdf"
+              onchange="checkAuthenticity(this.files)"
+            />
           </form>
         </div>
       </section>
     </main>
+    <script>
+      const checkAuthenticity = (files) => {
+        const filesArray = [...files];
+        filesArray.forEach(calculateHashAndCheckAuthenticity);
+      };
+
+      const readHtmlFile = async (file) => {
+        // get tuf-authenticate part
+        // reset local urls
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) =>
+            resolve(new TextEncoder("utf-8").encode(e.target.result));
+          reader.onerror = (e) => reject();
+          reader.readAsText(file);
+        });
+      };
+
+      const readPdfFile = async (file) => {
+        return new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = (e) => resolve(e.target.result);
+          reader.onerror = (e) => reject();
+          reader.readAsArrayBuffer(file);
+        });
+      };
+
+      const sha256 = async (msgBuffer) => {
+        const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
+        const hashArray = Array.from(new Uint8Array(hashBuffer));
+        const hashHex = hashArray
+          .map((b) => ("00" + b.toString(16)).slice(-2))
+          .join("");
+        return hashHex;
+      };
+
+      const calculateHashAndCheckAuthenticity = async (file, _) => {
+        let hash;
+        switch (file.type) {
+          case "text/html":
+            hash = await sha256(await readHtmlFile(file));
+            break;
+          case "application/pdf":
+            hash = await sha256(await readPdfFile(file));
+            break;
+          default:
+        }
+        // TODO: How to know file id (like url in case of auth from extensions)
+        // TODO: Send hash and file id to the server
+      };
+    </script>
   </body>
 </html>
