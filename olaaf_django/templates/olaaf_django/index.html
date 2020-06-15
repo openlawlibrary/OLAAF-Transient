@@ -1,10 +1,57 @@
 <html>
   <head>
     <meta charset="UTF-8" />
+    <style>
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        font-size: 18px;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      body {
+        font-family: Helvetica;
+      }
+
+      main {
+        height: 70vh;
+        padding-top: 10vh;
+      }
+
+      #drop-area {
+        border: 2px dashed #ccc;
+        border-radius: 10px;
+        width: 80vw;
+        max-width: 480px;
+        font-family: sans-serif;
+        margin: auto;
+        padding: 20px;
+      }
+
+      .auth-form {
+        margin-bottom: 10px;
+      }
+    </style>
   </head>
   <body>
     <main>
-      Check authenticity
+      <section>
+        <div id="drop-area">
+          <form class="auth-form" enctype="multipart/form-data">
+            <p>
+              Please upload or drag-n-drop files you want to authenticate.
+              <b>Html</b> and <b>pdf</b> file are supported.
+            </p>
+            <input type="file" id="auth-file" multiple accept=".html,.pdf" />
+          </form>
+        </div>
+      </section>
     </main>
   </body>
 </html>
