@@ -6,7 +6,8 @@ from django.template import loader
 from lxml import html as et_html
 
 from .models import Hash, Path, Publication
-from .utils import calc_hash, get_auth_div_content, get_html_document, reset_local_urls
+from .utils import (calc_hash, get_auth_div_content, get_html_document,
+                    reset_local_urls)
 
 HTML_CONTENT_TYPE = mimetypes.types_map.get('.html')
 PDF_CONTENT_TYPE = mimetypes.types_map.get('.pdf')
@@ -77,8 +78,7 @@ def _calculate_html_hash(html_content):
   return calc_hash(et_html.tostring(body_section))
 
 
-class AuthenticationResponse():
-
+class AuthenticationResponse:
   def __init__(self, url, authenticable=True, authentic=False, current=False, from_date=None,
                to_date=None, date=None):
     self.authenticable = authenticable

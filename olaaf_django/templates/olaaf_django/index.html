@@ -41,6 +41,10 @@
       .auth-form {
         margin-bottom: 10px;
       }
+
+      #file-list {
+        margin: auto;
+      }
     </style>
   </head>
   <body>
@@ -50,7 +54,7 @@
           <form class="auth-form" enctype="multipart/form-data">
             <p>
               Please upload or drag-n-drop files you want to authenticate.
-              <b>Html</b> and <b>pdf</b> file are supported.
+              <b>Html</b> and <b>pdf</b> files are supported.
             </p>
             <input
               type="file"
@@ -62,10 +66,61 @@
           </form>
         </div>
       </section>
+      <section>
+        <ul id="file-list"></ul>
+      </section>
     </main>
     <script>
-      const checkAuthenticity = (files) => {
-        [...files].forEach(calculateHashAndCheckAuthenticity);
+      const fileList = document.getElementById("file-list");
+
+      const appendFileItem = (file) => {
+        const el = document.createElement("li");
+        el.innerHTML = `<span id="${file.name}"><u>${file.name}</u></span>`;
+        fileList.append(el);
+      };
+
+      const checkAuthenticity = async (files) => {
+        const filesHashes = [];
+        for (const f of files) {
+          try {
+            const hash = await calculateHash(f);
+            filesHashes.push({ fileName: f.name, fileHash: hash });
+            appendFileItem(f);
+          } catch (e) {
+            console.log(e.message);
+          }
+        }
+
+        try {
+          const authResponse = await sendCheckHashesRequest(filesHashes);
+          Object.keys(authResponse).forEach((fileName) => {
+            const status = authResponse[fileName];
+            const fileItem = document.getElementById(status.fileName);
+            fileItem.innerHTML += ` | Authentic: ${status.authentic} | Current: ${status.current}`;
+          });
+        } catch (e) {
+          // could not authenticate file(s)
+          console.log(e.message);
+        }
+      };
+
+      const sendCheckHashesRequest = async (data) => {
+        return new Promise((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          const url = window.location.origin + "/_api/check-hashes";
+          xhr.open("POST", url, true);
+          xhr.setRequestHeader("Content-Type", "application/json");
+          xhr.onreadystatechange = function () {
+            if (xhr.readyState === 4) {
+              if (xhr.status === 200) {
+                resolve(JSON.parse(xhr.responseText));
+              } else {
+                reject("Error");
+              }
+            }
+          };
+          xhr.send(JSON.stringify(data));
+        });
       };
 
       const getAuthDiv = (html) => {
@@ -116,19 +171,15 @@
         return hashHex;
       };
 
-      const calculateHashAndCheckAuthenticity = async (file, _) => {
-        let hash;
+      const calculateHash = async (file, _) => {
         switch (file.type) {
           case "text/html":
-            hash = await sha256(await readHtmlFile(file));
-            break;
+            return await sha256(await readHtmlFile(file));
           case "application/pdf":
-            hash = await sha256(await readPdfFile(file));
-            break;
+            return await sha256(await readPdfFile(file));
           default:
+            throw new Error(`File type ${file.type} is not supported!`);
         }
-        // TODO: How to know file id (like url in case of auth from extensions)
-        // TODO: Send hash and file id to the server
       };
 
       const preventDefaults = (e) => {
