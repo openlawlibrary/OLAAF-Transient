@@ -28,10 +28,10 @@ DEBUG = True
 ALLOWED_HOSTS = []
 
 HOSTS_REPOS_CACHE = {
-    'localhost:8000': 'DCCouncil/law-html',
-    '127.0.0.1:8000': 'DCCouncil/law-html',
-    'localhost:5000': 'DCCouncil/law-html',
-    '127.0.0.1:5000': 'DCCouncil/law-html'
+    'localhost:8000': 'cityofsanmateo/law-html',
+    '127.0.0.1:8000': 'cityofsanmateo/law-html',
+    'localhost:5000': 'cityofsanmateo/law-html',
+    '127.0.0.1:5000': 'cityofsanmateo/law-html'
 }
 
 # Application definition
