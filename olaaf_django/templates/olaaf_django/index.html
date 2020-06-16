@@ -34,6 +34,10 @@
         padding: 20px;
       }
 
+      #drop-area.highlight {
+        border-color: red;
+      }
+
       .auth-form {
         margin-bottom: 10px;
       }
@@ -61,8 +65,7 @@
     </main>
     <script>
       const checkAuthenticity = (files) => {
-        const filesArray = [...files];
-        filesArray.forEach(calculateHashAndCheckAuthenticity);
+        [...files].forEach(calculateHashAndCheckAuthenticity);
       };
 
       const getAuthDiv = (html) => {
@@ -127,6 +130,37 @@
         // TODO: How to know file id (like url in case of auth from extensions)
         // TODO: Send hash and file id to the server
       };
+
+      const preventDefaults = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      };
+
+      // drag-n-drop
+      const dropArea = document.getElementById("drop-area");
+
+      const highlight = (e) => {
+        dropArea.classList.add("highlight");
+      };
+
+      const unhighlight = (e) => {
+        dropArea.classList.remove("highlight");
+      };
+
+      ["dragenter", "dragover", "dragleave", "drop"].forEach((eventName) => {
+        dropArea.addEventListener(eventName, preventDefaults, false);
+      });
+      ["dragenter", "dragover"].forEach((eventName) => {
+        dropArea.addEventListener(eventName, highlight, false);
+      });
+      ["dragleave", "drop"].forEach((eventName) => {
+        dropArea.addEventListener(eventName, unhighlight, false);
+      });
+
+      const dropFiles = (e) => {
+        checkAuthenticity(e.dataTransfer.files);
+      };
+      dropArea.addEventListener("drop", dropFiles, false);
     </script>
   </body>
 </html>
