@@ -80,7 +80,7 @@ def _calculate_html_hash(html_content):
 
 class AuthenticationResponse:
   def __init__(self, url, authenticable=True, authentic=False, current=False, from_date=None,
-               to_date=None, date=None):
+               to_date=None, date=None, link=None):
     self.authenticable = authenticable
     self.authentic = authentic
     self.current = current
@@ -97,6 +97,6 @@ class AuthenticationResponse:
     resp = template.render(context, request)
     response = HttpResponse(resp)
     # addresses the CORS issue
-    # robably not the best good solution, but allows development
+    # probably not the best solution, but allows development
     response["Access-Control-Allow-Origin"] = "*"
     return response
