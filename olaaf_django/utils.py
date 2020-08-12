@@ -57,7 +57,7 @@ def get_html_document(page_source):
 def get_auth_div_content(doc):
   """
   <Purpose>
-    Get div which contains class tuf-authetnicate belonging to the provided document
+    Get div which contains class tuf-authenticate belonging to the provided document
   <Arguments>
     doc:
       An lxml document
