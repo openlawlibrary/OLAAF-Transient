@@ -33,6 +33,7 @@ class Publication(models.Model):
   date = models.DateField()
   revoked = models.BooleanField(default=False)
   repository = models.ForeignKey(Repository, on_delete=models.CASCADE)
+  core_version = models.CharField(max_length=25, null=True)
 
   for_partner = publication_manager_for_partner
 
