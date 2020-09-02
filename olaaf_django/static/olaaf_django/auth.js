@@ -18,7 +18,7 @@ const checkAuthenticity = async (files) => {
   for (const f of files) {
     try {
       const hash = await calculateHash(f);
-      filesHashes.push({ fileName: f.name, fileHash: hash });
+      filesHashes.push({ name: f.name, hash: hash });
       appendFileItem(f);
     } catch (e) {
       console.log(e.message);
@@ -29,7 +29,7 @@ const checkAuthenticity = async (files) => {
     const authResponse = await sendCheckHashesRequest(filesHashes);
     Object.keys(authResponse).forEach((fileName) => {
       const status = authResponse[fileName];
-      const fileItem = document.getElementById(status.fileName);
+      const fileItem = document.getElementById(status.name);
       fileItem.innerHTML += ` | Authentic: ${status.authentic} | Current: ${status.current}`;
     });
   } catch (e) {
