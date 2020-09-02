@@ -7,6 +7,8 @@ from django.views.decorators.http import require_http_methods
 
 from . import get_repo_info
 from .authentication import AuthenticationResponse, check_authenticity
+from .messages import (VALID_CURRENT_DOC_MSG, VALID_OUTDATED_DOC_MSG,
+                       format_message)
 from .models import Hash, Publication
 
 URL_RE = re.compile(
@@ -48,22 +50,34 @@ def check_hashes(request):
   try:
     data = json.loads(request.body)
     for file_info in data:
-      file_name = file_info.get('fileName')
-      file_hash = file_info.get('fileHash')
+      file_name = file_info.get('name')
+      file_hash = file_info.get('hash')
+
+      authentic = False
+      msg = None
 
       try:
         hash_obj = Hash.objects.get(value=file_hash)
 
         authentic = True
-        current = hash_obj.end_commit_id is None
-      except Exception:
-        authentic = False
-        current = False
+
+        start_date = hash_obj.start_commit.date
+        if hash_obj.end_commit:
+          end_date = hash_obj.end_commit.date
+          msg = format_message(VALID_OUTDATED_DOC_MSG,
+                               start_date=start_date, end_date=end_date)
+        else:
+          msg = format_message(VALID_CURRENT_DOC_MSG, start_date=start_date)
+
+      except Hash.DoesNotExist:
+        pass
+      except Exception as e:
+        msg = f'An error ocurred: {e}'
 
       results[file_name] = dict(
-          fileName=file_name,
+          name=file_name,
           authentic=authentic,
-          current=current,
+          msg=msg
       )
   except Exception:
     pass

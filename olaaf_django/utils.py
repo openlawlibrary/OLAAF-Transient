@@ -152,3 +152,12 @@ def reset_local_urls(html_doc_str, pub_name, date, doc=None):
   Remove `/_api/_date/<date>/_doc/<doc>` from all absolute local urls in the html document.
   """
   return html_doc_str.replace(URL_PREFIX(pub_name, date, doc), '')
+
+
+def format_date(date, fmt='%B %d, %Y'):
+  try:
+    if isinstance(date, str):
+      date = dt.datetime.strptime(date, '%Y-%m-%d')
+    return date.strftime(fmt)
+  except (AttributeError, ValueError):
+    return date
