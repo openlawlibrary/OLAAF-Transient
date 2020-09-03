@@ -60,7 +60,11 @@ def check_hashes(request):
       url = None
 
       try:
-        hash_obj = Hash.objects.get(value=file_hash)
+        hash_obj = (
+            Hash.objects
+            .filter(value=file_hash)
+            .order_by("-path__publication_id")
+        )[0]
 
         authentic = True
 
@@ -78,7 +82,7 @@ def check_hashes(request):
         doc_date = start_date.strftime('%Y-%m-%d')
         url = f'{URL_PREFIX(pub_name, doc_date)}/{doc_path}'
 
-      except Hash.DoesNotExist:
+      except IndexError:
         pass
       except Exception as e:
         msg = f'An error ocurred: {e}'
