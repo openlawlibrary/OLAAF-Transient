@@ -46,7 +46,7 @@ def authenticate(request):
 @csrf_exempt
 @require_http_methods(['POST'])
 def check_hashes(request):
-  results = {}
+  results = []
   try:
     data = json.loads(request.body)
     for file_info in data:
@@ -74,15 +74,15 @@ def check_hashes(request):
       except Exception as e:
         msg = f'An error ocurred: {e}'
 
-      results[file_name] = dict(
+      results.append(dict(
           name=file_name,
           authentic=authentic,
           msg=msg
-      )
+      ))
   except Exception:
     pass
 
-  return JsonResponse(results)
+  return JsonResponse(results, safe=False)
 
 
 def _extract_url(url):
