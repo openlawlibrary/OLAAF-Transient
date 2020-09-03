@@ -10,6 +10,7 @@ from .authentication import AuthenticationResponse, check_authenticity
 from .messages import (VALID_CURRENT_DOC_MSG, VALID_OUTDATED_DOC_MSG,
                        format_message)
 from .models import Hash, Publication
+from .utils import URL_PREFIX
 
 URL_RE = re.compile(
     r'((\/)?_publication\/(?P<pub>(\d{4}-\d{2}(-\d{2})?(-\d{2})?)))?' +  # backwards compatible
@@ -55,6 +56,7 @@ def check_hashes(request):
 
       authentic = False
       msg = None
+      url = None
 
       try:
         hash_obj = Hash.objects.get(value=file_hash)
@@ -69,15 +71,21 @@ def check_hashes(request):
         else:
           msg = format_message(VALID_CURRENT_DOC_MSG, start_date=start_date)
 
+        doc_path = hash_obj.path.url
+        pub_name = hash_obj.path.publication.name
+        doc_date = start_date.strftime('%Y-%m-%d')
+        url = f'{URL_PREFIX(pub_name, doc_date)}/{doc_path}'
+
       except Hash.DoesNotExist:
         pass
       except Exception as e:
         msg = f'An error ocurred: {e}'
 
       results.append(dict(
-          name=file_name,
           authentic=authentic,
-          msg=msg
+          msg=msg,
+          name=file_name,
+          url=url,
       ))
   except Exception:
     pass
