@@ -55,6 +55,7 @@ def check_hashes(request):
       file_hash = file_info.get('hash')
 
       authentic = False
+      current = False
       msg = None
       url = None
 
@@ -69,6 +70,7 @@ def check_hashes(request):
           msg = format_message(VALID_OUTDATED_DOC_MSG,
                                start_date=start_date, end_date=end_date)
         else:
+          current = True
           msg = format_message(VALID_CURRENT_DOC_MSG, start_date=start_date)
 
         doc_path = hash_obj.path.url
@@ -83,6 +85,7 @@ def check_hashes(request):
 
       results.append(dict(
           authentic=authentic,
+          current=current,
           msg=msg,
           name=file_name,
           url=url,
