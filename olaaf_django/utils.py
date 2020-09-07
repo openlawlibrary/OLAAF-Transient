@@ -12,17 +12,22 @@ hasher = hashlib.sha256
 logger = logging.getLogger(__name__)
 
 
-def calc_hash(content):
+def calc_hash(content, file_type):
   """
   <Purpose>
     Calculate sha-256 hash of the provided binary string
   <Arguments>
     content:
       Binary string whose hash will be calculated
+    file_type:
+      html/pdf file
   <Returns>
     sha-256 hash of the input
   """
-  return hasher(strip_content(content)).hexdigest()
+  if file_type == 'html':
+    content = strip_content(content)
+
+  return hasher(content).hexdigest()
 
 
 def calc_file_hash(file_path):
