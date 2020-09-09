@@ -7,8 +7,7 @@ from django.views.decorators.http import require_http_methods
 
 from . import get_repo_info
 from .authentication import AuthenticationResponse, check_authenticity
-from .messages import (VALID_CURRENT_DOC_MSG, VALID_OUTDATED_DOC_MSG,
-                       format_message)
+from .messages import VALID_CURRENT_DOC_MSG, VALID_OUTDATED_DOC_MSG, format_message
 from .models import Hash, Publication
 from .utils import URL_PREFIX
 
@@ -78,9 +77,14 @@ def check_hashes(request):
           msg = format_message(VALID_CURRENT_DOC_MSG, start_date=start_date)
 
         doc_path = hash_obj.path.url
-        pub_name = hash_obj.path.publication.name
-        doc_date = start_date.strftime('%Y-%m-%d')
-        url = f'{URL_PREFIX(pub_name, doc_date)}/{doc_path}'
+        doc_fs_path = hash_obj.path.filesystem
+        # prepend publication name and date for html files
+        if doc_fs_path.endswith('html'):
+            pub_name = hash_obj.path.publication.name
+            doc_date = start_date.strftime('%Y-%m-%d')
+            url = f'{URL_PREFIX(pub_name, doc_date)}/{doc_path}'
+        else:
+            url = f'/{doc_path}'
 
       except IndexError:
         pass
