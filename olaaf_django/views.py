@@ -7,7 +7,8 @@ from django.views.decorators.http import require_http_methods
 
 from . import get_repo_info
 from .authentication import AuthenticationResponse, check_authenticity
-from .messages import VALID_CURRENT_DOC_MSG, VALID_OUTDATED_DOC_MSG, format_message
+from .messages import (VALID_CURRENT_DOC_MSG, VALID_OUTDATED_HTML_DOC_MSG,
+                       VALID_OUTDATED_PDF_DOC_MSG, format_message)
 from .models import Hash, Publication
 from .utils import URL_PREFIX
 
@@ -68,23 +69,37 @@ def check_hashes(request):
         authentic = True
 
         start_date = hash_obj.start_commit.date
-        if hash_obj.end_commit:
-          end_date = hash_obj.end_commit.date
-          msg = format_message(VALID_OUTDATED_DOC_MSG,
-                               start_date=start_date, end_date=end_date)
-        else:
-          current = True
-          msg = format_message(VALID_CURRENT_DOC_MSG, start_date=start_date)
-
+        end_date = hash_obj.end_commit.date if hash_obj.end_commit else None
         doc_path = hash_obj.path.url
         doc_fs_path = hash_obj.path.filesystem
-        # prepend publication name and date for html files
+
+        # html files
         if doc_fs_path.endswith('html'):
-            pub_name = hash_obj.path.publication.name
-            doc_date = start_date.strftime('%Y-%m-%d')
-            url = f'{URL_PREFIX(pub_name, doc_date)}/{doc_path}'
+          # url
+          pub_name = hash_obj.path.publication.name
+          doc_date = start_date.strftime('%Y-%m-%d')
+          url = f'{URL_PREFIX(pub_name, doc_date)}/{doc_path}'
+
+          # message
+          if end_date:
+            msg = format_message(VALID_OUTDATED_HTML_DOC_MSG,
+                                 start_date=start_date, end_date=end_date)
+          else:
+            current = True
+            msg = format_message(VALID_CURRENT_DOC_MSG, start_date=start_date)
+        # other files
         else:
-            url = f'/{doc_path}'
+          # url
+          url = f'/{doc_path}'
+
+          # message
+          if end_date:
+            url = None
+            msg = format_message(VALID_OUTDATED_PDF_DOC_MSG,
+                                 start_date=start_date, end_date=end_date)
+          else:
+            current = True
+            msg = format_message(VALID_CURRENT_DOC_MSG, start_date=start_date)
 
       except IndexError:
         pass

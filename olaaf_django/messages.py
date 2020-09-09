@@ -1,8 +1,12 @@
 # TODO: i18n
 from .utils import format_date
 
-VALID_OUTDATED_DOC_MSG = """
+VALID_OUTDATED_HTML_DOC_MSG = """
 Document was valid between {start_date} and {end_date}.
+"""
+
+VALID_OUTDATED_PDF_DOC_MSG = """
+Document was valid between {start_date} and {end_date}, but it is no longer present.
 """
 
 VALID_CURRENT_DOC_MSG = """
