@@ -449,7 +449,7 @@ def _calculate_file_hashes(file_content, doc, file_type):
     # this is an html file, calculate its rendered hash
     auth_div = get_auth_div_content(doc)
     if auth_div is not None:
-      rendered_hash_value = calc_hash(et_html.tostring(auth_div, encoding="utf-8"))
+      rendered_hash_value = calc_hash(et_html.tostring(auth_div, encoding="utf-8"), file_type)
       rendered_hash = Hash(value=rendered_hash_value, hash_type=Hash.RENDERED)
 
   return bitstream_hash, rendered_hash

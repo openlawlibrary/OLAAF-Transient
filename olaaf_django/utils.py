@@ -20,28 +20,14 @@ def calc_hash(content, file_type):
     content:
       Binary string whose hash will be calculated
     file_type:
-      html/pdf file
+      File extension or content type
   <Returns>
     sha-256 hash of the input
   """
-  if file_type == 'html':
+  if file_type in ['html', 'text/html']:
     content = strip_content(content)
 
   return hasher(content).hexdigest()
-
-
-def calc_file_hash(file_path):
-  """
-  <Purpose>
-    Calculate sha-256 hash of a file with at the provided path
-  <Arguments>
-    file_path:
-      Path to file whose hash will be calculated
-  <Returns>
-    sha-256 hash of content of a file at the provided path
-  """
-  content = open(file_path, 'rb').read()
-  return calc_hash(content)
 
 
 def get_html_document(page_source):

@@ -26,7 +26,7 @@ def check_authenticity(publication, pub_name, date, path, url, content, content_
     content = reset_local_urls(content, pub_name, date)
 
   try:
-    hash_value = hashing_func(content)
+    hash_value = hashing_func(content, content_type)
   except Exception:
     return AuthenticationResponse(url, authenticable=False)
 
@@ -68,14 +68,14 @@ def _is_authenticable(publication, path):
   return Path.objects.filter(publication=publication, url=path).count() > 0
 
 
-def _calculate_binary_content_hash(binary_content):
-  return calc_hash(binary_content)
+def _calculate_binary_content_hash(binary_content, file_type):
+  return calc_hash(binary_content, file_type)
 
 
-def _calculate_html_hash(html_content):
+def _calculate_html_hash(html_content, file_type):
   doc = get_html_document(html_content)
   body_section = get_auth_div_content(doc)
-  return calc_hash(et_html.tostring(body_section, encoding="utf-8"))
+  return calc_hash(et_html.tostring(body_section, encoding="utf-8"), file_type)
 
 
 class AuthenticationResponse:
