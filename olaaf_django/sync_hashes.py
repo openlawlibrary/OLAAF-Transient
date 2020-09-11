@@ -17,7 +17,7 @@ from selenium.webdriver.chrome.options import Options
 
 from olaaf_django.models import Commit, Hash, Path, Publication, Repository
 from olaaf_django.utils import (calc_hash, get_auth_div_content,
-                                get_html_document, is_iso_date, timed_run)
+                                get_html_document, timed_run)
 
 logger = logging.getLogger(__name__)
 

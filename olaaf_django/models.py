@@ -51,7 +51,6 @@ class Publication(models.Model):
 class Commit(models.Model):
   sha = models.CharField(max_length=40)
   date = models.DateField()
-  document = models.CharField(max_length=100)
   revoked = models.BooleanField(default=False)
   publication = models.ForeignKey(Publication, on_delete=models.CASCADE)
 
