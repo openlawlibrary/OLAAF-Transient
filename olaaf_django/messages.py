@@ -6,7 +6,7 @@ Document was valid between {start_date} and {end_date}.
 """
 
 VALID_OUTDATED_PDF_DOC_MSG = """
-Document was valid between {start_date} and {end_date}, but it is no longer present.
+Document was valid between {start_date} and {end_date}, but it is no longer available.
 """
 
 VALID_CURRENT_DOC_MSG = """
