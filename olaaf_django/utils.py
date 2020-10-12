@@ -12,31 +12,22 @@ hasher = hashlib.sha256
 logger = logging.getLogger(__name__)
 
 
-def calc_hash(content):
+def calc_hash(content, file_type):
   """
   <Purpose>
     Calculate sha-256 hash of the provided binary string
   <Arguments>
     content:
       Binary string whose hash will be calculated
+    file_type:
+      File extension or content type
   <Returns>
     sha-256 hash of the input
   """
-  return hasher(strip_content(content)).hexdigest()
+  if file_type in ['html', 'text/html']:
+    content = strip_content(content)
 
-
-def calc_file_hash(file_path):
-  """
-  <Purpose>
-    Calculate sha-256 hash of a file with at the provided path
-  <Arguments>
-    file_path:
-      Path to file whose hash will be calculated
-  <Returns>
-    sha-256 hash of content of a file at the provided path
-  """
-  content = open(file_path, 'rb').read()
-  return calc_hash(content)
+  return hasher(content).hexdigest()
 
 
 def get_html_document(page_source):
@@ -57,7 +48,7 @@ def get_html_document(page_source):
 def get_auth_div_content(doc):
   """
   <Purpose>
-    Get div which contains class tuf-authetnicate belonging to the provided document
+    Get div which contains class tuf-authenticate belonging to the provided document
   <Arguments>
     doc:
       An lxml document
@@ -152,3 +143,12 @@ def reset_local_urls(html_doc_str, pub_name, date, doc=None):
   Remove `/_api/_date/<date>/_doc/<doc>` from all absolute local urls in the html document.
   """
   return html_doc_str.replace(URL_PREFIX(pub_name, date, doc), '')
+
+
+def format_date(date, fmt='%B %d, %Y'):
+  try:
+    if isinstance(date, str):
+      date = dt.datetime.strptime(date, '%Y-%m-%d')
+    return date.strftime(fmt)
+  except (AttributeError, ValueError):
+    return date

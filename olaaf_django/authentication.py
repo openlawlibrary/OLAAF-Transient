@@ -6,7 +6,8 @@ from django.template import loader
 from lxml import html as et_html
 
 from .models import Hash, Path, Publication
-from .utils import calc_hash, get_auth_div_content, get_html_document, reset_local_urls
+from .utils import (calc_hash, get_auth_div_content, get_html_document,
+                    reset_local_urls)
 
 HTML_CONTENT_TYPE = mimetypes.types_map.get('.html')
 PDF_CONTENT_TYPE = mimetypes.types_map.get('.pdf')
@@ -25,7 +26,7 @@ def check_authenticity(publication, pub_name, date, path, url, content, content_
     content = reset_local_urls(content, pub_name, date)
 
   try:
-    hash_value = hashing_func(content)
+    hash_value = hashing_func(content, content_type)
   except Exception:
     return AuthenticationResponse(url, authenticable=False)
 
@@ -67,20 +68,19 @@ def _is_authenticable(publication, path):
   return Path.objects.filter(publication=publication, url=path).count() > 0
 
 
-def _calculate_binary_content_hash(binary_content):
-  return calc_hash(binary_content)
+def _calculate_binary_content_hash(binary_content, file_type):
+  return calc_hash(binary_content, file_type)
 
 
-def _calculate_html_hash(html_content):
+def _calculate_html_hash(html_content, file_type):
   doc = get_html_document(html_content)
   body_section = get_auth_div_content(doc)
-  return calc_hash(et_html.tostring(body_section))
+  return calc_hash(et_html.tostring(body_section, encoding="utf-8"), file_type)
 
 
-class AuthenticationResponse():
-
+class AuthenticationResponse:
   def __init__(self, url, authenticable=True, authentic=False, current=False, from_date=None,
-               to_date=None, date=None):
+               to_date=None, date=None, link=None):
     self.authenticable = authenticable
     self.authentic = authentic
     self.current = current
@@ -97,6 +97,6 @@ class AuthenticationResponse():
     resp = template.render(context, request)
     response = HttpResponse(resp)
     # addresses the CORS issue
-    # robably not the best good solution, but allows development
+    # probably not the best solution, but allows development
     response["Access-Control-Allow-Origin"] = "*"
     return response

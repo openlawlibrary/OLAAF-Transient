@@ -18,6 +18,7 @@ from selenium.webdriver.chrome.options import Options
 from olaaf_django.models import Commit, Hash, Path, Publication, Repository
 from olaaf_django.utils import (calc_hash, get_auth_div_content,
                                 get_html_document, timed_run)
+from taf.git import GitRepository
 
 logger = logging.getLogger(__name__)
 
@@ -330,7 +331,7 @@ def _insert_diff_hashes(publication, repo, prev_commit, current_commit, chrome_d
         current_query_length += 1
 
     if action != 'D':
-      bitstream_hash, rendered_hash = _calculate_file_hashes(file_content, doc)
+      bitstream_hash, rendered_hash = _calculate_file_hashes(file_content, doc, file_type)
       hashes_by_paths_and_types[(posix_path, Hash.BITSTREAM)] = bitstream_hash
       if rendered_hash is not None:
         hashes_by_paths_and_types[(posix_path, Hash.RENDERED)] = rendered_hash
@@ -429,7 +430,7 @@ def _add_and_update_paths_and_hashes(current_commit, hashes_queries, hashes_by_p
   Hash.objects.bulk_create(hashes_by_paths_and_types.values())
 
 
-def _calculate_file_hashes(file_content, doc):
+def _calculate_file_hashes(file_content, doc, file_type):
   """
   <Purpose>
     Calculate bitstream and rendered hash of a file
@@ -442,7 +443,7 @@ def _calculate_file_hashes(file_content, doc):
     bitstream hash, rendered hash
   """
   # calculate bitstream hash
-  hash_value = calc_hash(file_content)
+  hash_value = calc_hash(file_content, file_type)
   bitstream_hash = Hash(value=hash_value, hash_type=Hash.BITSTREAM)
 
   rendered_hash = None
@@ -450,7 +451,7 @@ def _calculate_file_hashes(file_content, doc):
     # this is an html file, calculate its rendered hash
     auth_div = get_auth_div_content(doc)
     if auth_div is not None:
-      rendered_hash_value = calc_hash(et_html.tostring(auth_div))
+      rendered_hash_value = calc_hash(et_html.tostring(auth_div, encoding="utf-8"), file_type)
       rendered_hash = Hash(value=rendered_hash_value, hash_type=Hash.RENDERED)
 
   return bitstream_hash, rendered_hash
@@ -490,14 +491,16 @@ def _get_file_content_and_document(repo, commit_sha, file_path, file_type, chrom
     <Returns>
       (file content, lxml document)
   """
-  file_content = repo.git.show('{}:{}'.format(commit_sha, file_path))
-  file_content = file_content.strip().encode('utf-8', 'surrogateescape')
-
   doc = None
+
   if file_type == 'html':
+    file_content = repo.git.show('{}:{}'.format(commit_sha, file_path))
+    file_content = file_content.strip().encode('utf-8', 'surrogateescape')
     # If the file is an html file, get the document object so that it's possible to find
     # elements such as authentication div, search path and url
     doc = _get_document(file_content, chrome_driver)
+  else:
+    file_content = GitRepository(repo.git_dir).get_file(commit_sha, file_path, raw=True)
 
   return file_content, doc
 

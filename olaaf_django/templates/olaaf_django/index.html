@@ -1,0 +1,36 @@
+{% load static %}
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <link
+      rel="stylesheet"
+      type="text/css"
+      href="{% static 'olaaf_django/auth.css' %}"
+    />
+  </head>
+  <body>
+    <main>
+      <section>
+        <div id="drop-area">
+          <form class="auth-form" enctype="multipart/form-data">
+            <p>
+              Please upload or drag-n-drop files you want to authenticate.
+              <b>Html</b> and <b>pdf</b> files are supported.
+            </p>
+            <input
+              type="file"
+              id="auth-file"
+              multiple
+              accept=".html,.pdf"
+              onchange="checkAuthenticity(this.files)"
+            />
+          </form>
+        </div>
+      </section>
+      <section>
+        <ul id="file-list"></ul>
+      </section>
+    </main>
+    <script src="{% static 'olaaf_django/auth.js' %}"></script>
+  </body>
+</html>
