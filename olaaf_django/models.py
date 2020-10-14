@@ -33,6 +33,7 @@ class Publication(models.Model):
   date = models.DateField()
   revoked = models.BooleanField(default=False)
   repository = models.ForeignKey(Repository, on_delete=models.CASCADE)
+  core_version = models.CharField(max_length=25, null=True)
 
   for_partner = publication_manager_for_partner
 
@@ -50,7 +51,6 @@ class Publication(models.Model):
 class Commit(models.Model):
   sha = models.CharField(max_length=40)
   date = models.DateField()
-  document = models.CharField(max_length=100)
   revoked = models.BooleanField(default=False)
   publication = models.ForeignKey(Publication, on_delete=models.CASCADE)
 
