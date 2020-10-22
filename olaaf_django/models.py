@@ -55,10 +55,11 @@ class Commit(models.Model):
   publication = models.ForeignKey(Publication, on_delete=models.CASCADE)
 
   class Meta:
-    unique_together = [('publication', 'sha')]  # not ready to add this yet ('date', 'document')]
+    unique_together = [('publication', 'sha')]
     indexes = [
         models.Index(fields=['publication', 'sha']),
-        models.Index(fields=['date', 'id'])
+        models.Index(fields=['date', 'id']),
+        models.Index(fields=['publication', 'date']),
     ]
 
   def __str__(self):
