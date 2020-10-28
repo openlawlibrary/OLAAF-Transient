@@ -45,6 +45,9 @@ def sync_hashes(library_root, repos_data):
   """
   library_root = pathlib.Path(library_root)
   repos_data = _load_json_input(repos_data)
+  if not repos_data:
+    logger.info('Empty input data. No hashes to sync')
+    return
 
   for repo_name, repo_data in repos_data.items():
     repo_path = library_root / repo_name
@@ -61,6 +64,9 @@ def sync_hashes(library_root, repos_data):
     with webdriver.Chrome(options=chrome_options) as chrome_driver:
       # Call sync hashes for all publications
       for branch, commits_data in repo_data.items():
+        if not commits_data:
+          logger.info('Skipping branch %s. Commits data is empty', branch)
+          continue
         if _check_if_valid_publication_branch_name(branch):
           publication_name = branch.rsplit('/', 1)[1]
         else:
