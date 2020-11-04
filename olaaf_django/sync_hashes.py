@@ -275,7 +275,7 @@ def _insert_diff_hashes(publication, repo, prev_commit, current_commit, chrome_d
   hashes_by_paths_and_types = {}
   # keep track of new hashes which should be inserted into the database
 
-  diff = repo.git.diff('--name-status', prev_commit.sha, current_commit.sha)
+  diff = repo.git.diff('--name-status', '--no-renames', prev_commit.sha, current_commit.sha)
   diff_names = diff.split('\n')
 
   for changed_file in diff_names:
