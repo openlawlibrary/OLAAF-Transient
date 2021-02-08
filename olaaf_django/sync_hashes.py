@@ -510,7 +510,7 @@ def _get_file_content_and_document(repo, commit_sha, file_path, file_type, chrom
 
   return file_content, doc
 
-
+from lxml import html as et_html
 def _get_document(file_content, chrome_driver):
   """
   <Purpose>
@@ -523,19 +523,31 @@ def _get_document(file_content, chrome_driver):
       Content of an html file
   <Returns>
     lxml document object
+
+  !!!
+  removing the call to chrome_driver b/c it is sometimes crashing;
+  this renders transient authentication through plugin unusable b/c not
+  standardizing
+  
+  TODO: move html hash to request time rather than batching it at update time
+  this will also solve issues that arise when results from chromedriver change
+  over time.
+  !!!
   """
-  temp_dir = pathlib.Path(tempfile.gettempdir())
-  # the file must have .html extension
-  # if that is not the case, the browser will not open it correctly
-  file_path = (temp_dir / (str(uuid.uuid4()) + '.html')).resolve()
-  try:
-    with open(str(file_path), 'wb') as f:
-      f.write(file_content)
-    chrome_driver.get(f'file://{file_path}')
-    page_source = chrome_driver.page_source
-    return get_html_document(page_source)
-  finally:
-    file_path.unlink()
+  return et_html.fromstring(file_content)
+
+  # temp_dir = pathlib.Path(tempfile.gettempdir())
+  # # the file must have .html extension
+  # # if that is not the case, the browser will not open it correctly
+  # file_path = (temp_dir / (str(uuid.uuid4()) + '.html')).resolve()
+  # try:
+  #   with open(str(file_path), 'wb') as f:
+  #     f.write(file_content)
+  #   chrome_driver.get(f'file://{file_path}')
+  #   page_source = chrome_driver.page_source
+  #   return get_html_document(page_source)
+  # finally:
+  #   file_path.unlink()
 
 
 def _get_url(path, file_type, doc):
