@@ -8,7 +8,7 @@ from collections import defaultdict
 import pytest
 from lxml import html
 from selenium import webdriver
-from taf.git import NamedGitRepository
+from taf.git import GitRepository
 
 from olaaf_django.sync_hashes import chrome_options
 
@@ -113,7 +113,7 @@ NON_PUBLICATION_BRANCHES = {
 @pytest.fixture(scope='session')
 def html_repository_and_input():
   try:
-    repo = NamedGitRepository(LIBRARY_ROOT, HTML_REPO_NAME)
+    repo = GitRepository(LIBRARY_ROOT, HTML_REPO_NAME)
     repo.init_repo()
     repos_data = _init_pub_branches(repo)
     yield repo, repos_data
