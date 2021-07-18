@@ -506,7 +506,7 @@ def _get_file_content_and_document(repo, commit_sha, file_path, file_type, chrom
     # elements such as authentication div, search path and url
     doc = _get_document(file_content, chrome_driver)
   else:
-    file_content = GitRepository(repo.git_dir).get_file(commit_sha, file_path, raw=True)
+    file_content = GitRepository(path=repo.git_dir).get_file(commit_sha, file_path, raw=True)
 
   return file_content, doc
 
