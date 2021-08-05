@@ -76,8 +76,8 @@ def sync_hashes(library_root, repos_data):
           publication = Publication.objects.get(repository=repository,
                                                 name=publication_name)
         except Exception:
-          date = commits_data[0]["additional-info"]["build-date"]
-          core_version = commits_data[0]["additional-info"].get("core-version")
+          date = commits_data[0]["custom"]["build-date"]
+          core_version = commits_data[0]["custom"].get("core-version")
           try:
             publication = Publication.objects.create(repository=repository,
                                                      name=publication_name,
@@ -142,7 +142,7 @@ def _sync_hashes_for_publication(repo, publication, commits_data, chrome_driver)
     if prev_commit is None:
       prev_commit = commit
       continue
-    commit_info = commit_data.get("additional-info")
+    commit_info = commit_data.get("custom")
     if "codified-date" in commit_info:
       date = commit_info["codified-date"]
     elif "build-date" in commit_info:
