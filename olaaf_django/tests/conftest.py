@@ -170,14 +170,14 @@ def _init_pub_branches(repo, branches=PUBLICATION_BRANCHES):
       build_date, codified_date = msg.split('/')
       if build_date == 'publication':
         continue
-      additional_info = {"build-date": build_date}
+      custom = {"build-date": build_date}
       if codified_date is not None:
-        additional_info["codified-date"] = codified_date
+        custom["codified-date"] = codified_date
 
       repos_data[repo.name][branch].append(
         {
           "commit": sha,
-          "additional-info": additional_info
+          "custom": custom
         }
       )
 

@@ -1,10 +1,8 @@
-import json
 import logging
 import mimetypes
 from pathlib import Path
 
 from django.http import Http404
-from taf.repositoriesdb import get_repositories_paths_by_custom_data
 
 logger = logging.getLogger('django')
 
