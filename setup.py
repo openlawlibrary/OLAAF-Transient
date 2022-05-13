@@ -27,7 +27,7 @@ dev_require = [
 ]
 
 tests_require = [
-    "pytest==4.5.0",
+    "pytest==6.*",
 ]
 
 setup(
@@ -73,6 +73,7 @@ setup(
         'Programming Language :: Python :: 3',
         'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: Implementation :: CPython',
     ]
 )
