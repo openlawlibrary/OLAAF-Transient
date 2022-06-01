@@ -31,7 +31,7 @@ def _check_path_url(path):
 
 def test_synchashes(html_repository_and_input, non_publications, publications, repo_files, db):
   html_repository, html_repo_input = html_repository_and_input
-  sync_hashes(html_repository.root_dir, html_repo_input)
+  sync_hashes(html_repository.library_dir, html_repo_input)
 
   pub_branches = list(publications.keys())
 

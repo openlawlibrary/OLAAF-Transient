@@ -27,7 +27,8 @@ dev_require = [
 ]
 
 tests_require = [
-    "pytest==4.5.0",
+    "pytest-django==4.5.*",
+    "pytest==6.*",
 ]
 
 setup(
@@ -50,11 +51,11 @@ setup(
     ],
     zip_safe=False,
     install_requires=[
-        'Django >= 2.2',
-        'GitPython >= 2.1.11',
-        'selenium ~= 3.0',
-        'lxml >= 4.3',
-        'taf == 0.17.0',
+        "Django >= 2.2",
+        "GitPython >= 2.1.11",
+        "selenium ~= 3.0",
+        "lxml >= 4.3",
+        "taf == 0.18.0",
     ],
     extras_require={
         'ci': ci_require,
@@ -71,8 +72,11 @@ setup(
         'License :: OSI Approved :: Apache Software License',
         'Operating System :: OS Independent',
         'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.5',
         'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
+        'Programming Language :: Python :: 3.9',
+        'Programming Language :: Python :: 3.10',
         'Programming Language :: Python :: Implementation :: CPython',
     ]
 )

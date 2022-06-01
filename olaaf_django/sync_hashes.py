@@ -61,37 +61,36 @@ def sync_hashes(library_root, repos_data):
     logger.info('\n\n\nSyncing hashes of repository: %s', repo_name)
     repository, _ = Repository.objects.get_or_create(name=repo_name)
 
-    with webdriver.Chrome(options=chrome_options) as chrome_driver:
-      # Call sync hashes for all publications
-      for branch, commits_data in repo_data.items():
-        if not commits_data:
-          logger.info('Skipping branch %s. Commits data is empty', branch)
-          continue
-        if _check_if_valid_publication_branch_name(branch):
-          publication_name = branch.rsplit('/', 1)[1]
-        else:
-          publication_name = branch
+    # Call sync hashes for all publications
+    for branch, commits_data in repo_data.items():
+      if not commits_data:
+        logger.info('Skipping branch %s. Commits data is empty', branch)
+        continue
+      if _check_if_valid_publication_branch_name(branch):
+        publication_name = branch.rsplit('/', 1)[1]
+      else:
+        publication_name = branch
 
+      try:
+        publication = Publication.objects.get(repository=repository,
+                                              name=publication_name)
+      except Exception:
+        date = commits_data[0]["custom"]["build-date"]
+        core_version = commits_data[0]["custom"].get("core-version")
         try:
-          publication = Publication.objects.get(repository=repository,
-                                                name=publication_name)
-        except Exception:
-          date = commits_data[0]["custom"]["build-date"]
-          core_version = commits_data[0]["custom"].get("core-version")
-          try:
-            publication = Publication.objects.create(repository=repository,
-                                                     name=publication_name,
-                                                     date=date,
-                                                     core_version=core_version)
-          except Exception as e:
-            logger.error('Could not create publication %s due to error:\n%s',
-                         publication_name, str(e))
-            raise
+          publication = Publication.objects.create(repository=repository,
+                                                    name=publication_name,
+                                                    date=date,
+                                                    core_version=core_version)
+        except Exception as e:
+          logger.error('Could not create publication %s due to error:\n%s',
+                        publication_name, str(e))
+          raise
 
-        _sync_hashes_for_publication(repo, publication, commits_data, chrome_driver)
+      _sync_hashes_for_publication(repo, publication, commits_data)
 
-        # Mark publications on the same date as revoked
-        _revoke_same_date_publications(publication)
+      # Mark publications on the same date as revoked
+      _revoke_same_date_publications(publication)
 
 
 def _load_json_input(repos_data):
@@ -125,7 +124,7 @@ def _revoke_same_date_publications(publication):
 
 
 @timed_run()
-def _sync_hashes_for_publication(repo, publication, commits_data, chrome_driver):
+def _sync_hashes_for_publication(repo, publication, commits_data):
   # check if commits are already in the database
   # if they are, see if there are commits which have not been inserted yet
   # if not, insert the hashes from the beginning
@@ -164,7 +163,7 @@ def _sync_hashes_for_publication(repo, publication, commits_data, chrome_driver)
       continue
 
     try:
-      _insert_diff_hashes(publication, repo, prev_commit, current_commit, chrome_driver)
+      _insert_diff_hashes(publication, repo, prev_commit, current_commit)
     except Exception as e:
       # Deletes commit and its hashes, but keeps paths
       logger.error('And error occurred while inserting hashes of commit %s: %s',
@@ -240,7 +239,7 @@ def _check_if_valid_publication_branch_name(branch_name):
   return True
 
 
-def _insert_diff_hashes(publication, repo, prev_commit, current_commit, chrome_driver):
+def _insert_diff_hashes(publication, repo, prev_commit, current_commit):
   """
   <Purpose>
     Inserts and updates hashes for each document that was added, modified
@@ -299,8 +298,7 @@ def _insert_diff_hashes(publication, repo, prev_commit, current_commit, chrome_d
     # its hash(es) and, if the file is an html file which was added, to read its url
     if action != 'D':
       file_content, doc = _get_file_content_and_document(repo, current_commit.sha,
-                                                         posix_path, file_type,
-                                                         chrome_driver)
+                                                         posix_path, file_type)
 
     if action == 'A':
       # If a new file was added, create a new path object. Calculating url here might be unnecessary
@@ -481,7 +479,7 @@ def _calculate_html_url(path):
   return path.rsplit('.', 1)[0]
 
 
-def _get_file_content_and_document(repo, commit_sha, file_path, file_type, chrome_driver):
+def _get_file_content_and_document(repo, commit_sha, file_path, file_type):
   """
   <Purpose>
     Read content of a file at a given revision. If that file is an html file,
@@ -504,14 +502,14 @@ def _get_file_content_and_document(repo, commit_sha, file_path, file_type, chrom
     file_content = file_content.strip().encode('utf-8', 'surrogateescape')
     # If the file is an html file, get the document object so that it's possible to find
     # elements such as authentication div, search path and url
-    doc = _get_document(file_content, chrome_driver)
+    doc = _get_document(file_content)
   else:
     file_content = GitRepository(path=repo.git_dir).get_file(commit_sha, file_path, raw=True)
 
   return file_content, doc
 
 from lxml import html as et_html
-def _get_document(file_content, chrome_driver):
+def _get_document(file_content):
   """
   <Purpose>
     Creates an lxml document object given content of an html file.

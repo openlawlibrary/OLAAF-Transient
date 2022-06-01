@@ -10,13 +10,12 @@ from git import Repo
 from lxml import html
 
 from olaaf_django import HOSTS_REPOS_CACHE
-from olaaf_django.authentication import check_authenticity
 from olaaf_django.models import Commit, Publication
 from olaaf_django.sync_hashes import _get_document, sync_hashes
 from olaaf_django.tests.conftest import _change_file_content
 
 
-def _get_file_content(chrome_driver, repo, url, change_auth_div=False):
+def _get_file_content(repo, url, change_auth_div=False):
   parts = url.split('/', 4)
 
   pub = parts[1]
@@ -38,7 +37,7 @@ def _get_file_content(chrome_driver, repo, url, change_auth_div=False):
   if change_auth_div:
     content = _change_file_content(content)
   # replace links inside html doc
-  document = _get_document(content.strip().encode('utf-8', 'surrogateescape'), chrome_driver)
+  document = _get_document(content.strip().encode('utf-8', 'surrogateescape'))
   try:
     link = document.get_element_by_id("test-url")
     link.attrib['href'] = f"/{'/'.join(parts[:4])}{link.attrib['href']}"
@@ -48,11 +47,11 @@ def _get_file_content(chrome_driver, repo, url, change_auth_div=False):
   return html.tostring(document, encoding="utf-8").decode("utf-8")
 
 
-def test_html_authentication(html_repository_and_input, publications, repo_files, chrome_driver, db):
+def test_html_authentication(html_repository_and_input, publications, repo_files, db):
   html_repository, html_repo_input = html_repository_and_input
   repo = Repo(html_repository.path)
 
-  sync_hashes(html_repository.root_dir, html_repo_input)
+  sync_hashes(html_repository.library_dir, html_repo_input)
 
   # list of urls like '_publication/2020-01-01/_date/2019-01-01/index.html'
   test_urls = list([
@@ -74,7 +73,7 @@ def test_html_authentication(html_repository_and_input, publications, repo_files
     response = auth_post(
         data={
             'url': url,
-            'content': _get_file_content(chrome_driver, repo, url, change_auth_div=change_auth_div)
+            'content': _get_file_content(repo, url, change_auth_div=change_auth_div)
         }
     )
 
