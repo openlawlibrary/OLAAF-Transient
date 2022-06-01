@@ -27,6 +27,7 @@ dev_require = [
 ]
 
 tests_require = [
+    "pytest-django==4.5.*",
     "pytest==6.*",
 ]
 
