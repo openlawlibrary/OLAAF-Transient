@@ -15,6 +15,12 @@ jobs:
         with:
           python-version: "${{ matrix.python-version }}"
           architecture: x64
+      - run: git config --global user.email "you@example.com"
+      - run: git config --global user.name "Your Name"
+      - name: install taf
+        run: |
+          git clone https://github.com/openlawlibrary/taf
+          pip install -e taf
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
