@@ -15,8 +15,7 @@ def set_hosts_repos_cache_from_settings(settings):
     global HOSTS_REPOS_CACHE
     HOSTS_REPOS_CACHE = settings.HOSTS_REPOS_CACHE
   except AttributeError:
-    logger.error("Could not read 'HOSTS_REPOS_CACHE ' from settings")
-    raise Exception("Could not read 'HOSTS_REPOS_CACHE ' from settings")
+    logger.error("Could not read 'HOSTS_REPOS_CACHE' from settings")
 
 
 def get_repo_by_host(host):

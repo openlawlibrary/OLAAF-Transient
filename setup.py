@@ -1,7 +1,7 @@
 from setuptools import find_packages, setup
 
 PACKAGE_NAME = 'olaaf-transient'
-VERSION = '0.21.0'
+VERSION = '0.22.0'
 AUTHOR = 'Open Law Library'
 AUTHOR_EMAIL = 'info@openlawlib.org'
 DESCRIPTION = 'Implementation of transient authentication'
@@ -27,7 +27,7 @@ dev_require = [
 ]
 
 tests_require = [
-    "pytest-django==4.5.*",
+    "pytest-django==4.*",
     "pytest==6.*",
 ]
 
@@ -51,7 +51,7 @@ setup(
     ],
     zip_safe=False,
     install_requires=[
-        "Django >= 2.2",
+        "Django >= 3.2.*",
         "GitPython >= 2.1.11",
         "selenium ~= 3.0",
         "lxml >= 4.3",
