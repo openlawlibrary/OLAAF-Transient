@@ -1,7 +1,7 @@
 from setuptools import find_packages, setup
 
 PACKAGE_NAME = 'olaaf-transient'
-VERSION = '0.24.3'
+VERSION = '0.24.4'
 AUTHOR = 'Open Law Library'
 AUTHOR_EMAIL = 'info@openlawlib.org'
 DESCRIPTION = 'Implementation of transient authentication'
@@ -55,7 +55,7 @@ setup(
         "GitPython >= 2.1.11",
         "selenium ~= 3.0",
         "lxml >= 4.3",
-        "taf == 0.22.3",
+        "taf == 0.22.4",
     ],
     extras_require={
         'ci': ci_require,
