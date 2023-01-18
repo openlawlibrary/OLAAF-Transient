@@ -66,6 +66,9 @@ def sync_hashes(library_root, repos_data):
       if not commits_data:
         logger.info('Skipping branch %s. Commits data is empty', branch)
         continue
+      if "build-date" not in commits_data[0]["custom"]:
+        logger.info("Skipping branch %s. Not a valid publication branch", branch)
+        continue
       if _check_if_valid_publication_branch_name(branch):
         publication_name = branch.rsplit('/', 1)[1]
       else:
