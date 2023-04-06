@@ -55,7 +55,7 @@ setup(
         "GitPython >= 2.1.11",
         "selenium ~= 3.0",
         "lxml >= 4.3",
-        "taf == 0.24.0",
+        "taf == 0.25.0",
     ],
     extras_require={
         'ci': ci_require,
