@@ -310,7 +310,7 @@ def _insert_diff_hashes(publication, repo, prev_commit, current_commit):
       # will have to be created than not
       url = _get_url(posix_path, file_type, doc)
       try:
-        search_path = doc.xpath('.//@data-search-path')[-1] if doc is not None else None
+        search_path = doc.xpath('.//@data-search-path')[-1] + '|' if doc is not None else None
       except IndexError:
         doc_title = doc.xpath('//title/text()')
         logger.debug('Document with title %s does not contain data-search-path!\n', doc_title)
