@@ -51,7 +51,7 @@ setup(
     ],
     zip_safe=False,
     install_requires=[
-        "Django >= 3.2.*",
+        "Django == 3.2.*",
         "GitPython >= 2.1.11",
         "selenium ~= 3.0",
         "lxml >= 4.3",
