@@ -17,6 +17,11 @@ jobs:
           architecture: x64
       - run: git config --global user.email "you@example.com"
       - run: git config --global user.name "Your Name"
+
+      - name: Upgrade pip
+        run: |
+          pip install --upgrade pip setuptools wheel
+
       - name: install taf
         run: |
           git clone https://github.com/openlawlibrary/taf
