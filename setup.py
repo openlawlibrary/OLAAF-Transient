@@ -28,7 +28,7 @@ dev_require = [
 
 tests_require = [
     "pytest-django==4.*",
-    "pytest==6.*",
+    "pytest>=6,<10",
 ]
 
 setup(
